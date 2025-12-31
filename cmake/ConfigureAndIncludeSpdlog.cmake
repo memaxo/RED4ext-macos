@@ -4,6 +4,7 @@ option(SPDLOG_FMT_EXTERNAL "" ON)
 option(SPDLOG_NO_THREAD_ID "" ON)
 option(SPDLOG_WCHAR_FILENAMES "" ON)
 option(SPDLOG_WCHAR_SUPPORT "" ON)
+option(SPDLOG_WCHAR_TO_UTF8_SUPPORT "" ON)
 
 add_subdirectory(deps/spdlog)
 set_target_properties(spdlog PROPERTIES FOLDER "Dependencies")

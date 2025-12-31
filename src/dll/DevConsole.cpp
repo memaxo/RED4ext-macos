@@ -8,6 +8,7 @@ DevConsole::DevConsole(const Config::DevConfig& aConfig)
 {
     if (aConfig.hasConsole)
     {
+#ifndef RED4EXT_PLATFORM_MACOS
         if (AllocConsole())
         {
             m_isCreated = true;
@@ -44,6 +45,10 @@ DevConsole::DevConsole(const Config::DevConfig& aConfig)
         {
             SHOW_LAST_ERROR_MESSAGE_FILE_LINE(L"Could not create the development console.");
         }
+#else
+        m_isCreated = true;
+        // On macOS, stdout/stderr are already visible if launched from terminal.
+#endif
     }
 }
 
@@ -67,7 +72,9 @@ DevConsole::~DevConsole()
 
     if (m_isCreated)
     {
+#ifndef RED4EXT_PLATFORM_MACOS
         FreeConsole();
+#endif
     }
 }
 

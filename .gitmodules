@@ -25,3 +25,6 @@
 [submodule "deps/simdjson"]
 	path = deps/simdjson
 	url = https://github.com/simdjson/simdjson.git
+[submodule "deps/fishhook"]
+	path = deps/fishhook
+	url = https://github.com/facebook/fishhook.git

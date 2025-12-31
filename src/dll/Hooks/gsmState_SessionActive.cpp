@@ -21,10 +21,10 @@ void _GsmState_SessionActive_ReportErrorCode(uintptr_t aThis)
     {
         static const auto type = RED4ext::CRTTISystem::Get()->GetEnum("gsmStateError");
 
-        spdlog::error("=======");
-        spdlog::error("A game session error occurred. Error code: {} ({}).", type->hashList[errorCode].ToString(),
+        Log::error("=======");
+        Log::error("A game session error occurred. Error code: {} ({}).", type->hashList[errorCode].ToString(),
                       errorCode);
-        spdlog::error("=======");
+        Log::error("=======");
     }
 
     return GsmState_SessionActive_ReportErrorCode(aThis);
@@ -33,18 +33,18 @@ void _GsmState_SessionActive_ReportErrorCode(uintptr_t aThis)
 
 bool Hooks::gsmState_SessionActive::Attach()
 {
-    spdlog::trace("Trying to attach the hook for the game session error code reporter at {:#x}...",
+    Log::trace("Trying to attach the hook for the game session error code reporter at {:#x}...",
                   GsmState_SessionActive_ReportErrorCode.GetAddress());
 
     auto result = GsmState_SessionActive_ReportErrorCode.Attach();
     if (result != NO_ERROR)
     {
-        spdlog::error("Could not attach the hook for the game session error code reporter. Detour error code: {}",
+        Log::error("Could not attach the hook for the game session error code reporter. Detour error code: {}",
                       result);
     }
     else
     {
-        spdlog::trace("The hook for the game session error code reporter was attached");
+        Log::trace("The hook for the game session error code reporter was attached");
     }
 
     isAttached = result == NO_ERROR;
@@ -58,18 +58,18 @@ bool Hooks::gsmState_SessionActive::Detach()
         return false;
     }
 
-    spdlog::trace("Trying to detach the hook for the game session error code reporter at {:#x}...",
+    Log::trace("Trying to detach the hook for the game session error code reporter at {:#x}...",
                   GsmState_SessionActive_ReportErrorCode.GetAddress());
 
     auto result = GsmState_SessionActive_ReportErrorCode.Detach();
     if (result != NO_ERROR)
     {
-        spdlog::error("Could not detach the hook for the game session error code reporter. Detour error code: {}",
+        Log::error("Could not detach the hook for the game session error code reporter. Detour error code: {}",
                       result);
     }
     else
     {
-        spdlog::trace("The hook for the game session error code reporter was detached");
+        Log::trace("The hook for the game session error code reporter was detached");
     }
 
     isAttached = result != NO_ERROR;

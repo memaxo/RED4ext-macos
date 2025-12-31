@@ -52,16 +52,16 @@ int WINAPI _Main(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR pCmdLine, i
 
 bool Hooks::Main::Attach()
 {
-    spdlog::trace("Trying to attach the hook for the main function at {:#x}...", Main_fnc.GetAddress());
+    Log::trace("Trying to attach the hook for the main function at {:#x}...", Main_fnc.GetAddress());
 
     auto result = Main_fnc.Attach();
     if (result != NO_ERROR)
     {
-        spdlog::error("Could not attach the hook for the main function. Detour error code: {}", result);
+        Log::error("Could not attach the hook for the main function. Detour error code: {}", result);
     }
     else
     {
-        spdlog::trace("The hook for the main function was attached");
+        Log::trace("The hook for the main function was attached");
     }
 
     isAttached = result == NO_ERROR;
@@ -75,16 +75,16 @@ bool Hooks::Main::Detach()
         return false;
     }
 
-    spdlog::trace("Trying to detach the hook for the main function at {:#x}...", Main_fnc.GetAddress());
+    Log::trace("Trying to detach the hook for the main function at {:#x}...", Main_fnc.GetAddress());
 
     auto result = Main_fnc.Detach();
     if (result != NO_ERROR)
     {
-        spdlog::error("Could not detach the hook for the main function. Detour error code: {}", result);
+        Log::error("Could not detach the hook for the main function. Detour error code: {}", result);
     }
     else
     {
-        spdlog::trace("The hook for the main function was detached");
+        Log::trace("The hook for the main function was detached");
     }
 
     isAttached = result != NO_ERROR;

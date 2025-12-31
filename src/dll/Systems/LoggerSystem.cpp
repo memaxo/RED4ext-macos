@@ -23,7 +23,7 @@ void LoggerSystem::Shutdown()
 {
     auto count = m_loggers.size();
 
-    spdlog::trace("Flusing {} logger(s)...", count);
+    Log::trace("Flusing {} logger(s)...", count);
 
     for (auto& [plugin, logger] : m_loggers)
     {
@@ -31,7 +31,7 @@ void LoggerSystem::Shutdown()
     }
 
     m_loggers.clear();
-    spdlog::trace("{} logger(s) flushed", count);
+    Log::trace("{} logger(s) flushed", count);
 }
 
 void LoggerSystem::RotateLogs(std::vector<std::wstring> pluginNames) const
@@ -44,7 +44,7 @@ void LoggerSystem::RotateLogs(std::vector<std::wstring> pluginNames) const
         // Ignore and try the next time.
         return;
     }
-    spdlog::trace("Rotate logs...");
+    Log::trace("Rotate logs...");
     pluginNames.emplace_back(L"RED4ext");
 
     // List all log files.

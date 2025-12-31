@@ -1,17 +1,24 @@
 #include "DetourTransaction.hpp"
 #include "Utils.hpp"
+#include "Platform.hpp"
+
+#ifdef RED4EXT_PLATFORM_MACOS
+#include <mach/mach.h>
+#include <mach/thread_act.h>
+#include <mach/vm_map.h>
+#endif
 
 DetourTransaction::DetourTransaction(const std::source_location aSource)
     : m_source(aSource)
     , m_state(State::Invalid)
 {
-    spdlog::trace("Trying to start a detour transaction in '{}' ({}:{})", m_source.function_name(),
+    Log::trace("Trying to start a detour transaction in '{}' ({}:{})", m_source.function_name(),
                   m_source.file_name(), m_source.line());
 
     auto result = DetourTransactionBegin();
     if (result == NO_ERROR)
     {
-        spdlog::trace("Transaction was started successfully", m_source.function_name(), m_source.file_name(),
+        Log::trace("Transaction was started successfully", m_source.function_name(), m_source.file_name(),
                       m_source.line());
 
         QueueThreadsForUpdate();
@@ -19,7 +26,7 @@ DetourTransaction::DetourTransaction(const std::source_location aSource)
     }
     else
     {
-        spdlog::error("Could not start the detour transaction in '{}' ({}:{}). Detour error code: {}",
+        Log::error("Could not start the detour transaction in '{}' ({}:{}). Detour error code: {}",
                       m_source.function_name(), m_source.file_name(), m_source.line(), result);
     }
 }
@@ -40,7 +47,7 @@ const bool DetourTransaction::IsValid() const
 
 bool DetourTransaction::Commit()
 {
-    spdlog::trace("Committing the transaction...");
+    Log::trace("Committing the transaction...");
 
     if (m_state != State::Started && m_state != State::Failed)
     {
@@ -48,22 +55,22 @@ bool DetourTransaction::Commit()
         {
         case State::Invalid:
         {
-            spdlog::warn("The transaction is in an invalid state");
+            Log::warn("The transaction is in an invalid state");
             break;
         }
         case State::Committed:
         {
-            spdlog::warn("The transaction is already committed");
+            Log::warn("The transaction is already committed");
             break;
         }
         case State::Aborted:
         {
-            spdlog::warn("The transaction is aborted, can not commit it");
+            Log::warn("The transaction is aborted, can not commit it");
             break;
         }
         default:
         {
-            spdlog::warn("Unknown transaction state. State: {}", static_cast<int32_t>(m_state));
+            Log::warn("Unknown transaction state. State: {}", static_cast<int32_t>(m_state));
             break;
         }
         }
@@ -74,19 +81,59 @@ bool DetourTransaction::Commit()
     auto result = DetourTransactionCommit();
     if (result != NO_ERROR)
     {
-        spdlog::error("Could not commit the transaction. Detours error code: {}", result);
+        Log::error("Could not commit the transaction. Detours error code: {}", result);
         return false;
     }
 
+#ifdef RED4EXT_PLATFORM_MACOS
+    // Resume suspended threads
+    for (auto thread : m_threads)
+    {
+        thread_resume(thread);
+        mach_port_deallocate(mach_task_self(), thread);
+    }
+    
+    // Deallocate thread array and any threads we didn't suspend
+    if (m_threadArray)
+    {
+        thread_t selfThread = mach_thread_self();
+        for (mach_msg_type_number_t i = 0; i < m_threadCount; i++)
+        {
+            // Check if this thread was suspended (and already deallocated)
+            bool wasSuspended = false;
+            for (auto suspendedThread : m_threads)
+            {
+                if (m_threadArray[i] == suspendedThread)
+                {
+                    wasSuspended = true;
+                    break;
+                }
+            }
+            // Don't deallocate self thread or suspended threads (already done)
+            if (!wasSuspended && m_threadArray[i] != selfThread)
+            {
+                mach_port_deallocate(mach_task_self(), m_threadArray[i]);
+            }
+        }
+        mach_port_deallocate(mach_task_self(), selfThread);
+        vm_deallocate(mach_task_self(), reinterpret_cast<vm_address_t>(m_threadArray), 
+                     m_threadCount * sizeof(thread_t));
+        m_threadArray = nullptr;
+        m_threadCount = 0;
+    }
+    
+    m_threads.clear();
+#endif
+
     SetState(State::Committed);
-    spdlog::trace("The transaction was committed successfully");
+    Log::trace("The transaction was committed successfully");
 
     return true;
 }
 
 bool DetourTransaction::Abort()
 {
-    spdlog::trace("Aborting the transaction...");
+    Log::trace("Aborting the transaction...");
 
     if (m_state != State::Started && m_state != State::Failed)
     {
@@ -94,22 +141,22 @@ bool DetourTransaction::Abort()
         {
         case State::Invalid:
         {
-            spdlog::warn("The transaction is in an invalid state");
+            Log::warn("The transaction is in an invalid state");
             break;
         }
         case State::Committed:
         {
-            spdlog::warn("The transaction is committed, can not abort it");
+            Log::warn("The transaction is committed, can not abort it");
             break;
         }
         case State::Aborted:
         {
-            spdlog::warn("The transaction is already aborted");
+            Log::warn("The transaction is already aborted");
             break;
         }
         default:
         {
-            spdlog::warn("Unknown transaction state. State: {}", static_cast<int32_t>(m_state));
+            Log::warn("Unknown transaction state. State: {}", static_cast<int32_t>(m_state));
             break;
         }
         }
@@ -122,28 +169,103 @@ bool DetourTransaction::Abort()
     {
         // If this happen, we can't abort it.
         SetState(State::Failed);
-        spdlog::error("Could not abort the transaction. Detours error code: {}", result);
+        Log::error("Could not abort the transaction. Detours error code: {}", result);
 
         return false;
     }
 
+#ifdef RED4EXT_PLATFORM_MACOS
+    // Resume suspended threads
+    for (auto thread : m_threads)
+    {
+        thread_resume(thread);
+        mach_port_deallocate(mach_task_self(), thread);
+    }
+    
+    // Deallocate thread array and any threads we didn't suspend
+    if (m_threadArray)
+    {
+        thread_t selfThread = mach_thread_self();
+        for (mach_msg_type_number_t i = 0; i < m_threadCount; i++)
+        {
+            // Check if this thread was suspended (and already deallocated)
+            bool wasSuspended = false;
+            for (auto suspendedThread : m_threads)
+            {
+                if (m_threadArray[i] == suspendedThread)
+                {
+                    wasSuspended = true;
+                    break;
+                }
+            }
+            // Don't deallocate self thread or suspended threads (already done)
+            if (!wasSuspended && m_threadArray[i] != selfThread)
+            {
+                mach_port_deallocate(mach_task_self(), m_threadArray[i]);
+            }
+        }
+        mach_port_deallocate(mach_task_self(), selfThread);
+        vm_deallocate(mach_task_self(), reinterpret_cast<vm_address_t>(m_threadArray), 
+                     m_threadCount * sizeof(thread_t));
+        m_threadArray = nullptr;
+        m_threadCount = 0;
+    }
+    
+    m_threads.clear();
+#endif
+
     SetState(State::Aborted);
-    spdlog::trace("The transaction was aborted successfully");
+    Log::trace("The transaction was aborted successfully");
 
     return true;
 }
 
 void DetourTransaction::QueueThreadsForUpdate()
 {
-    spdlog::trace("Queueing threads for detour update...");
+    Log::trace("Queueing threads for detour update...");
 
+#ifdef RED4EXT_PLATFORM_MACOS
+    kern_return_t kr = task_threads(mach_task_self(), &m_threadArray, &m_threadCount);
+    if (kr != KERN_SUCCESS)
+    {
+        Log::warn("Could not retrieve task threads. Error code: {}", kr);
+        m_threadArray = nullptr;
+        m_threadCount = 0;
+        return;
+    }
+
+    thread_t selfThread = mach_thread_self();
+    for (mach_msg_type_number_t i = 0; i < m_threadCount; i++)
+    {
+        if (m_threadArray[i] != selfThread)
+        {
+            if (thread_suspend(m_threadArray[i]) == KERN_SUCCESS)
+            {
+                m_threads.push_back(m_threadArray[i]);
+            }
+            else
+            {
+                Log::warn("Could not suspend thread {}.", m_threadArray[i]);
+                // Deallocate thread port we couldn't suspend
+                mach_port_deallocate(mach_task_self(), m_threadArray[i]);
+            }
+        }
+        else
+        {
+            // Don't store self thread, but also don't deallocate it yet
+        }
+    }
+    mach_port_deallocate(mach_task_self(), selfThread);
+
+    Log::trace("{} thread(s) queued for detour update (excl. current thread)", m_threads.size());
+#else
     wil::unique_tool_help_snapshot snapshot(CreateToolhelp32Snapshot(TH32CS_SNAPTHREAD, 0));
     if (!snapshot)
     {
         auto msg = Utils::FormatLastError();
-        spdlog::warn(L"Could not create a snapshot of the threads. The transaction will continue but unexpected "
+        Log::warn(L"Could not create a snapshot of the threads. The transaction will continue but unexpected "
                      L"behavior might happen. Error code: {}, msg: '{}'",
-                     GetLastError(), msg);
+                     Platform::GetLastError(), msg);
         return;
     }
 
@@ -153,9 +275,9 @@ void DetourTransaction::QueueThreadsForUpdate()
     if (!Thread32First(snapshot.get(), &entry))
     {
         auto msg = Utils::FormatLastError();
-        spdlog::warn(L"Could not get the first thread entry from the snapshot. The transaction will continue but "
+        Log::warn(L"Could not get the first thread entry from the snapshot. The transaction will continue but "
                      L"unexpected behavior might happen. Error code: {}, msg: '{}'",
-                     GetLastError(), msg);
+                     Platform::GetLastError(), msg);
         return;
     }
 
@@ -178,7 +300,7 @@ void DetourTransaction::QueueThreadsForUpdate()
                 }
                 else
                 {
-                    spdlog::warn(L"Could not queue the thread for update. The transaction will continue but unexpected "
+                    Log::warn(L"Could not queue the thread for update. The transaction will continue but unexpected "
                                  L"behavior might happen. Thread ID: {}, handle: {}, detour error code: {}",
                                  entry.th32ThreadID, handle.get(), result);
                 }
@@ -186,23 +308,24 @@ void DetourTransaction::QueueThreadsForUpdate()
             else
             {
                 auto msg = Utils::FormatLastError();
-                spdlog::warn(L"Could not open a thread. The transaction will continue but unexpected behavior might "
+                Log::warn(L"Could not open a thread. The transaction will continue but unexpected behavior might "
                              L"happen. Thread ID: {}, error code: {}, msg: '{}'",
-                             entry.th32ThreadID, GetLastError(), msg);
+                             entry.th32ThreadID, Platform::GetLastError(), msg);
             }
         }
 
         shouldContinue = Thread32Next(snapshot.get(), &entry);
-        if (!shouldContinue && GetLastError() != ERROR_NO_MORE_FILES)
+        if (!shouldContinue && Platform::GetLastError() != ERROR_NO_MORE_FILES)
         {
             auto msg = Utils::FormatLastError();
-            spdlog::warn(L"Could not get the next thread entry from the snapshot. The transaction will continue but "
+            Log::warn(L"Could not get the next thread entry from the snapshot. The transaction will continue but "
                          L"unexpected behavior might happen. Error code: {}, msg: '{}'",
-                         GetLastError(), msg);
+                         Platform::GetLastError(), msg);
         }
     } while (shouldContinue);
 
-    spdlog::trace("{} thread(s) queued for detour update (excl. current thread)", m_handles.size());
+    Log::trace("{} thread(s) queued for detour update (excl. current thread)", m_handles.size());
+#endif
 }
 
 void DetourTransaction::SetState(const State aState)

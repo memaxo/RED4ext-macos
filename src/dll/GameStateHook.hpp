@@ -1,8 +1,13 @@
 #pragma once
 
 #include "MemoryProtection.hpp"
+#include "Platform.hpp"
 
 #include "Utils.hpp"
+
+#ifdef RED4EXT_PLATFORM_MACOS
+#include <libkern/OSCacheControl.h>
+#endif
 
 template<typename T>
 class GameStateHook
@@ -25,7 +30,7 @@ public:
         auto name = aState->GetName();
         auto vtbl = *reinterpret_cast<Func_t**>(aState);
 
-        spdlog::trace("Changing virtual functions for '{}' state at {}...", name, fmt::ptr(vtbl));
+        Log::trace("Changing virtual functions for '{}' state at {}...", name, fmt::ptr(vtbl));
 
         m_onEnter.orig = reinterpret_cast<Func_t>(vtbl[3]);
         m_onUpdate.orig = reinterpret_cast<Func_t>(vtbl[4]);
@@ -33,7 +38,7 @@ public:
 
         if (SwapVFuncs(aState, m_onEnter.detour, m_onUpdate.detour, m_onExit.detour))
         {
-            spdlog::trace("Virtual functions for '{}' state were changed successfully", name);
+            Log::trace("Virtual functions for '{}' state were changed successfully", name);
             return true;
         }
 
@@ -45,11 +50,11 @@ public:
         auto name = aState->GetName();
         auto vtbl = *reinterpret_cast<void**>(aState);
 
-        spdlog::trace("Restoring virtual functions for '{}' state at {}...", name, vtbl);
+        Log::trace("Restoring virtual functions for '{}' state at {}...", name, vtbl);
 
         if (SwapVFuncs(aState, m_onEnter.orig, m_onUpdate.orig, m_onExit.orig))
         {
-            spdlog::trace("Virtual functions for '{}' state were restored successfully", name);
+            Log::trace("Virtual functions for '{}' state were restored successfully", name);
             return true;
         }
 
@@ -122,48 +127,53 @@ private:
             constexpr auto VirtualFuncs = 3;
             constexpr auto size = VirtualFuncs * sizeof(addr);
 
-            MemoryProtection _(addr, size, PAGE_READWRITE);
+            MemoryProtection _(addr, size, Platform::Memory_ReadWrite);
 
             auto onEnter = &vtbl[3];
-            spdlog::trace("Changing 'OnEnter' function at {} from {} to {}...", fmt::ptr(onEnter), fmt::ptr(vtbl[3]),
+            Log::trace("Changing 'OnEnter' function at {} from {} to {}...", fmt::ptr(onEnter), fmt::ptr(vtbl[3]),
                           fmt::ptr(aOnEnter));
 
             *onEnter = aOnEnter;
-            spdlog::trace("'OnEnter' function was changed successfully");
+            Log::trace("'OnEnter' function was changed successfully");
 
             auto onUpdate = &vtbl[4];
-            spdlog::trace("Changing 'OnUpdate' function at {} from {} to {}...", fmt::ptr(onUpdate), fmt::ptr(vtbl[4]),
+            Log::trace("Changing 'OnUpdate' function at {} from {} to {}...", fmt::ptr(onUpdate), fmt::ptr(vtbl[4]),
                           fmt::ptr(aOnUpdate));
 
             *onUpdate = aOnUpdate;
-            spdlog::trace("'OnUpdate' function was changed successfully");
+            Log::trace("'OnUpdate' function was changed successfully");
 
             auto onExit = &vtbl[5];
-            spdlog::trace("Changing 'OnExit' function at {} from {} to {}...", fmt::ptr(onExit), fmt::ptr(vtbl[5]),
+            Log::trace("Changing 'OnExit' function at {} from {} to {}...", fmt::ptr(onExit), fmt::ptr(vtbl[5]),
                           fmt::ptr(aOnExit));
 
             *onExit = aOnExit;
-            spdlog::trace("'OnExit' function was changed successfully");
+            Log::trace("'OnExit' function was changed successfully");
+
+#ifdef RED4EXT_PLATFORM_MACOS
+            // Invalidate instruction cache for ARM64 after vtable modification
+            sys_icache_invalidate(addr, size);
+#endif
         }
         catch (const MemoryProtection::Exception&)
         {
-            spdlog::warn("Could not change / restoring the protection for '{}' state, the execution will continue but "
+            Log::warn("Could not change / restoring the protection for '{}' state, the execution will continue but "
                          "unexpected behavior might happen",
                          name);
             return false;
         }
         catch (const std::exception& e)
         {
-            spdlog::warn("An exception occured while changing / restoring the virtual functions for '{}' state, the "
+            Log::warn("An exception occured while changing / restoring the virtual functions for '{}' state, the "
                          "execution will continue but unexpected behavior might happen",
                          name);
-            spdlog::warn(e.what());
+            Log::warn(e.what());
 
             return false;
         }
         catch (...)
         {
-            spdlog::warn(
+            Log::warn(
                 "An unknown exception occured while changing / restoring the virtual functions for '{}' state, the "
                 "execution will continue but unexpected behavior might happen",
                 name);

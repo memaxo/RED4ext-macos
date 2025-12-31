@@ -1,0 +1,70 @@
+{
+  "_comment": "Manual address mappings for RED4ext macOS hooks. Generated 2025-01.",
+  "_binary": "Cyberpunk 2077 macOS v2.3.1",
+  "_base_address": "0x100000000",
+  "addresses": [
+        {
+            "name": "Main",
+            "address": "0x100031E18",
+            "segment": 1,
+      "status": "confirmed",
+      "evidence": "Entry point from Mach-O LC_MAIN (offset 0x31E18)"
+        },
+    {
+      "name": "AssertionFailed",
+      "address": "0x1003C3D4C",
+      "segment": 1,
+      "status": "confirmed",
+      "evidence": "References format string '%s(%d) : Assertion failed: %s' at 0x106C374C3"
+    },
+    {
+      "name": "CBaseEngine_InitScripts",
+      "address": "0x103D8C1A0",
+      "segment": 1,
+      "status": "confirmed",
+      "evidence": "References 'scriptsBlobPath' string, handles script initialization"
+    },
+    {
+      "name": "CBaseEngine_LoadScripts",
+      "address": "0x103D9A03C",
+      "segment": 1,
+      "status": "confirmed",
+      "evidence": "References 'final.redscripts' filename, handles script loading"
+    },
+    {
+      "name": "CGameApplication_AddState",
+      "address": "0x103F22E98",
+      "segment": 1,
+      "status": "confirmed",
+      "evidence": "Near CGameEngine reference, handles game application state transitions"
+    },
+    {
+      "name": "GsmState_SessionActive_ReportErrorCode",
+      "address": "0x103F5E9B0",
+      "segment": 1,
+      "status": "confirmed",
+      "evidence": "Loads error code from [X0, #0x88], near 'gsmStateError' string references"
+    },
+    {
+      "name": "ScriptValidator_Validate",
+      "address": "0x103D96BFC",
+      "segment": 1,
+      "status": "tentative",
+      "evidence": "In script region (0x103D9...), has 'set bool to true at offset 8' pattern (fillErrors)"
+    },
+    {
+      "name": "GameInstance_CollectSaveableSystems",
+      "address": "0x100087FEC",
+      "segment": 1,
+      "status": "tentative",
+      "evidence": "Has vtable[0x130] access with loop pattern for system iteration"
+    },
+    {
+      "name": "Global_ExecuteProcess",
+      "address": "0x101D46808",
+      "segment": 1,
+      "status": "tentative",
+      "evidence": "Calls _popen stub (0x104a3e5f0), but may be GPU profiler not scc execution"
+    }
+  ]
+}

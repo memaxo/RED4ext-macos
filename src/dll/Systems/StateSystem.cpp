@@ -13,7 +13,7 @@ void StateSystem::Startup()
 
 void StateSystem::Shutdown()
 {
-    spdlog::trace("Removing all game states...");
+    Log::trace("Removing all game states...");
 
     m_baseInitialization.onEnter.clear();
     m_baseInitialization.onUpdate.clear();
@@ -31,7 +31,7 @@ void StateSystem::Shutdown()
     m_shutdown.onUpdate.clear();
     m_shutdown.onExit.clear();
 
-    spdlog::trace("All game states were removed successfully");
+    Log::trace("All game states were removed successfully");
 }
 
 bool StateSystem::Add(std::shared_ptr<PluginBase> aPlugin, RED4ext::EGameStateType aStateType, Func_t aOnEnter,
@@ -118,7 +118,7 @@ StateSystem::State* StateSystem::GetStateByType(RED4ext::EGameStateType aStateTy
     }
     default:
     {
-        spdlog::warn("State with type {} is not handled", static_cast<int32_t>(aStateType));
+        Log::warn("State with type {} is not handled", static_cast<int32_t>(aStateType));
         break;
     }
     }
@@ -147,12 +147,12 @@ bool StateSystem::Run(std::wstring_view aAction, std::list<StateItem>& aList, RE
         }
         catch (const std::exception& e)
         {
-            spdlog::warn(L"An exception occured while executing '{}' registered by '{}'", aAction, pluginName);
-            spdlog::warn(e.what());
+            Log::warn(L"An exception occured while executing '{}' registered by '{}'", aAction, pluginName);
+            Log::warn(e.what());
         }
         catch (...)
         {
-            spdlog::warn(L"An unknown exception occured while executing '{}' registered by '{}'", aAction, pluginName);
+            Log::warn(L"An unknown exception occured while executing '{}' registered by '{}'", aAction, pluginName);
         }
     }
 

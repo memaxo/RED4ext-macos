@@ -2,6 +2,7 @@
 #include "Config.hpp"
 #include "DevConsole.hpp"
 #include "Paths.hpp"
+#include "Platform.hpp"
 #include "stdafx.hpp"
 
 #include <ctime>
@@ -9,6 +10,11 @@
 
 #include <spdlog/sinks/rotating_file_sink.h>
 #include <spdlog/sinks/stdout_color_sinks.h>
+
+#ifdef RED4EXT_PLATFORM_MACOS
+#include <codecvt>
+#include <locale>
+#endif
 
 std::shared_ptr<spdlog::logger> Utils::CreateLogger(const std::wstring_view aLogName, const std::wstring_view aFilename,
                                                     const Paths& aPaths, const Config& aConfig,
@@ -122,6 +128,9 @@ std::wstring Utils::GetStateName(RED4ext::EGameStateType aStateType)
 
 std::wstring Utils::FormatSystemMessage(uint32_t aMessageId)
 {
+#ifdef RED4EXT_PLATFORM_MACOS
+    return fmt::format(L"System message for id {}", aMessageId);
+#else
     wil::last_error_context last_error;
     wil::unique_hlocal_ptr<wchar_t> buffer;
 
@@ -131,7 +140,7 @@ std::wstring Utils::FormatSystemMessage(uint32_t aMessageId)
     if (!len)
     {
         return fmt::format(L"Could not format the system message for the specified message id ({}), error code: {}",
-                           aMessageId, GetLastError());
+                           aMessageId, Platform::GetLastError());
     }
 
     std::wstring_view res = buffer.get();
@@ -148,11 +157,12 @@ std::wstring Utils::FormatSystemMessage(uint32_t aMessageId)
     }
 
     return std::wstring(res);
+#endif
 }
 
 std::wstring Utils::FormatLastError()
 {
-    auto err = GetLastError();
+    auto err = Platform::GetLastError();
     return FormatSystemMessage(err);
 }
 
@@ -163,7 +173,11 @@ std::wstring Utils::FormatCurrentTimestamp()
 
     // Convert to std::tm for formatting
     std::tm now_tm;
+#ifdef RED4EXT_PLATFORM_MACOS
+    localtime_r(&now_c, &now_tm);
+#else
     localtime_s(&now_tm, &now_c);
+#endif
 
     return fmt::format(L"{:04d}-{:02d}-{:02d}-{:02d}-{:02d}-{:02d}", now_tm.tm_year + 1900, now_tm.tm_mon + 1,
                        now_tm.tm_mday, now_tm.tm_hour, now_tm.tm_min, now_tm.tm_sec);
@@ -171,7 +185,8 @@ std::wstring Utils::FormatCurrentTimestamp()
 
 int32_t Utils::ShowMessageBoxEx(const std::wstring_view aCaption, const std::wstring_view aText, uint32_t aType)
 {
-    return MessageBox(nullptr, aText.data(), aCaption.data(), aType);
+    Platform::ShowMessageBox(aCaption.data(), aText.data(), aType);
+    return 0;
 }
 
 int32_t Utils::ShowMessageBox(const std::wstring_view aText, uint32_t aType)
@@ -188,6 +203,17 @@ std::string Utils::Narrow(const std::wstring_view aText)
 
     std::string result;
 
+#ifdef RED4EXT_PLATFORM_MACOS
+    try
+    {
+        std::wstring_convert<std::codecvt_utf8<wchar_t>> converter;
+        result = converter.to_bytes(aText.data(), aText.data() + aText.size());
+    }
+    catch (...)
+    {
+        result = fmt::format("Failed to convert wide to narrow string");
+    }
+#else
     auto len =
         WideCharToMultiByte(CP_UTF8, 0, aText.data(), static_cast<int32_t>(aText.size()), nullptr, 0, NULL, NULL);
     if (len)
@@ -200,8 +226,9 @@ std::string Utils::Narrow(const std::wstring_view aText)
     // Second pass.
     if (len <= 0)
     {
-        result = fmt::format("Failed to convert wide to narrow string, last error is {}", GetLastError());
+        result = fmt::format("Failed to convert wide to narrow string, last error is {}", Platform::GetLastError());
     }
+#endif
 
     return result;
 }
@@ -215,6 +242,17 @@ std::wstring Utils::Widen(const std::string_view aText)
 
     std::wstring result;
 
+#ifdef RED4EXT_PLATFORM_MACOS
+    try
+    {
+        std::wstring_convert<std::codecvt_utf8<wchar_t>> converter;
+        result = converter.from_bytes(aText.data(), aText.data() + aText.size());
+    }
+    catch (...)
+    {
+        result = fmt::format(L"Failed to convert narrow to wide string");
+    }
+#else
     auto len = MultiByteToWideChar(CP_UTF8, 0, aText.data(), static_cast<int32_t>(aText.size()), nullptr, 0);
     if (len)
     {
@@ -226,8 +264,9 @@ std::wstring Utils::Widen(const std::string_view aText)
     // Second pass.
     if (len <= 0)
     {
-        result = fmt::format(L"Failed to convert narrow to wide string, last error is {}", GetLastError());
+        result = fmt::format(L"Failed to convert narrow to wide string, last error is {}", Platform::GetLastError());
     }
+#endif
 
     return result;
 }

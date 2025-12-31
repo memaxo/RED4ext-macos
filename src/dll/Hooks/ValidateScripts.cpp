@@ -29,11 +29,11 @@ bool _ScriptValidator_Validate(uint64_t self, uint64_t a1, RED4ext::ScriptReport
         auto ref = error.GetSourceRef();
         if (ref)
         {
-            spdlog::error("Script validation error: {} at {}:{}", message, ref->file, ref->line + 1);
+            Log::error("Script validation error: {} at {}:{}", message, ref->file, ref->line + 1);
         }
         else
         {
-            spdlog::error("Script validation error: {}", message);
+            Log::error("Script validation error: {}", message);
         }
     }
 
@@ -50,16 +50,16 @@ bool _ScriptValidator_Validate(uint64_t self, uint64_t a1, RED4ext::ScriptReport
 
 bool Hooks::ValidateScripts::Attach()
 {
-    spdlog::trace("Trying to attach the hook for validate scripts at {:#x}...", ScriptValidator_Validate.GetAddress());
+    Log::trace("Trying to attach the hook for validate scripts at {:#x}...", ScriptValidator_Validate.GetAddress());
 
     auto result = ScriptValidator_Validate.Attach();
     if (result != NO_ERROR)
     {
-        spdlog::error("Could not attach the hook for validate scripts. Detour error code: {}", result);
+        Log::error("Could not attach the hook for validate scripts. Detour error code: {}", result);
     }
     else
     {
-        spdlog::trace("The hook for validate scripts was attached");
+        Log::trace("The hook for validate scripts was attached");
     }
 
     isAttached = result == NO_ERROR;
@@ -73,16 +73,16 @@ bool Hooks::ValidateScripts::Detach()
         return false;
     }
 
-    spdlog::trace("Trying to detach the hook for validate scripts at {:#x}...", ScriptValidator_Validate.GetAddress());
+    Log::trace("Trying to detach the hook for validate scripts at {:#x}...", ScriptValidator_Validate.GetAddress());
 
     auto result = ScriptValidator_Validate.Detach();
     if (result != NO_ERROR)
     {
-        spdlog::error("Could not detach the hook for validate scripts. Detour error code: {}", result);
+        Log::error("Could not detach the hook for validate scripts. Detour error code: {}", result);
     }
     else
     {
-        spdlog::trace("The hook for validate scripts was detached");
+        Log::trace("The hook for validate scripts was detached");
     }
 
     isAttached = result != NO_ERROR;

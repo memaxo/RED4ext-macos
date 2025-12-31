@@ -14,13 +14,13 @@
     auto val = ec.value();                                                                                             \
     const auto& category = ec.category();                                                                              \
     auto msg = category.message(val);                                                                                  \
-    spdlog::error(text L". Error code: {}, msg: '{}'", val, Utils::Widen(msg))
+    Log::error(text L". Error code: {}, msg: '{}'", val, Utils::Widen(msg))
 
 #define LOG_FS_ENTRY_ERROR(text, entry, ec)                                                                            \
     auto val = ec.value();                                                                                             \
     const auto& category = ec.category();                                                                              \
     auto msg = category.message(val);                                                                                  \
-    spdlog::error(text L". Error code: {}, msg: '{}', entry: '{}'", val, Utils::Widen(msg), entry)
+    Log::error(text L". Error code: {}, msg: '{}', entry: '{}'", val, Utils::Widen(msg), entry)
 
 PluginSystem::PluginSystem(const Config::PluginsConfig& aConfig, const Paths& aPaths)
     : m_config(aConfig)
@@ -40,7 +40,7 @@ void PluginSystem::Startup()
         return;
     }
 
-    spdlog::info("Loading plugins...");
+    Log::info("Loading plugins...");
 
     std::error_code ec;
 
@@ -103,7 +103,7 @@ void PluginSystem::Startup()
             if (!entry.exists(ec))
             {
                 // Symlink is broken, skip it.
-                spdlog::warn(L"Symbolic link is broken, it will be skipped. Symlink: '{}'", path);
+                Log::warn(L"Symbolic link is broken, it will be skipped. Symlink: '{}'", path);
                 continue;
             }
             else if (ec)
@@ -118,12 +118,21 @@ void PluginSystem::Startup()
             continue;
         }
 
+#ifdef RED4EXT_PLATFORM_MACOS
+        if (entry.is_regular_file(ec) && path.extension() == L".dylib")
+#else
         if (entry.is_regular_file(ec) && path.extension() == L".dll")
+#endif
         {
             const auto stem = path.stem();
+#ifdef RED4EXT_PLATFORM_MACOS
+            // On macOS, convert to wstring for comparison with ignored list
+            if (m_config.ignored.count(stem.wstring()) > 0)
+#else
             if (m_config.ignored.contains(stem))
+#endif
             {
-                spdlog::debug(L"Skipping loading '{}', the plugin is ignored by the user. Path: '{}", stem, path);
+                Log::debug(L"Skipping loading '{}', the plugin is ignored by the user. Path: '{}", stem, path);
                 continue;
             }
 
@@ -147,7 +156,7 @@ void PluginSystem::Startup()
     // In the case where the exe is hosted, check if the host exe has RED4Ext exports
     Load(m_paths.GetExe(), false);
 
-    spdlog::info("{} plugin(s) loaded", m_plugins.size());
+    Log::info("{} plugin(s) loaded", m_plugins.size());
 }
 
 void PluginSystem::Shutdown()
@@ -158,14 +167,14 @@ void PluginSystem::Shutdown()
     }
 
     auto size = m_plugins.size();
-    spdlog::trace("Unloading {} plugin(s)...", size);
+    Log::trace("Unloading {} plugin(s)...", size);
 
     for (auto it = m_plugins.begin(); it != m_plugins.end();)
     {
         it = Unload(it->second);
     }
 
-    spdlog::info("{} plugin(s) unloaded", size);
+    Log::info("{} plugin(s) unloaded", size);
 }
 
 std::shared_ptr<PluginBase> PluginSystem::GetPlugin(HMODULE aModule) const
@@ -176,7 +185,7 @@ std::shared_ptr<PluginBase> PluginSystem::GetPlugin(HMODULE aModule) const
         return iter->second;
     }
 
-    spdlog::warn("Could not find a plugin with handle {}", fmt::ptr(aModule));
+    Log::warn("Could not find a plugin with handle {}", fmt::ptr(aModule));
     return nullptr;
 }
 
@@ -199,17 +208,46 @@ std::vector<PluginSystem::PluginName> PluginSystem::GetActivePlugins() const
 
 void PluginSystem::Load(const std::filesystem::path& aPath, bool aUseAlteredSearchPath)
 {
-    spdlog::info(L"Loading plugin from '{}'...", aPath);
+    Log::info(L"Loading plugin from '{}'...", aPath);
 
+    const auto stem = aPath.stem();
+
+    wil::unique_hmodule handle;
+#ifdef RED4EXT_PLATFORM_MACOS
+    if (aPath.extension() == L".app" || aPath.filename() == L"Cyberpunk2077")
+    {
+        // Main executable - use RTLD_DEFAULT
+        handle.reset(RTLD_DEFAULT);
+    }
+    else
+    {
+        // Load dylib with RTLD_GLOBAL to make symbols available to other plugins
+        int flags = RTLD_LAZY | RTLD_GLOBAL;
+        if (aUseAlteredSearchPath)
+        {
+            // On macOS, we can't easily change search path like Windows
+            // But we can try to load from the plugin's directory first
+            // For now, just use RTLD_GLOBAL
+        }
+        
+        std::string pathStr = aPath.string();
+        void* h = dlopen(pathStr.c_str(), flags);
+        if (!h)
+        {
+            const char* err = dlerror();
+            Log::warn(L"Could not load plugin '{}'. Error: '{}', path: '{}'", stem, 
+                        err ? Utils::Widen(err) : L"Unknown error", aPath);
+            return;
+        }
+        handle.reset(h);
+    }
+#else
     uint32_t flags = 0;
     if (aUseAlteredSearchPath)
     {
         flags = LOAD_WITH_ALTERED_SEARCH_PATH;
     }
 
-    const auto stem = aPath.stem();
-
-    wil::unique_hmodule handle;
     if (aPath.extension() == L".exe")
         handle.reset(GetModuleHandleA(nullptr));
     else
@@ -218,12 +256,13 @@ void PluginSystem::Load(const std::filesystem::path& aPath, bool aUseAlteredSear
     if (!handle)
     {
         auto msg = Utils::FormatLastError();
-        spdlog::warn(L"Could not load plugin '{}'. Error code: {}, msg: '{}', path: '{}'", stem, GetLastError(), msg,
+        Log::warn(L"Could not load plugin '{}'. Error code: {}, msg: '{}', path: '{}'", stem, GetLastError(), msg,
                      aPath);
         return;
     }
+#endif
 
-    spdlog::trace(L"'{}' has been loaded into the address space at {}", stem, fmt::ptr(handle.get()));
+    Log::trace(L"'{}' has been loaded into the address space at {}", stem, fmt::ptr(handle.get()));
 
     auto plugin = CreatePlugin(aPath, std::move(handle));
     if (!plugin)
@@ -261,7 +300,7 @@ void PluginSystem::Load(const std::filesystem::path& aPath, bool aUseAlteredSear
 
         if (!isSupported)
         {
-            spdlog::warn(
+            Log::warn(
                 L"{} (version: {}) is incompatible with the current patch. The requested runtime of the plugin is {}",
                 pluginName, std::to_wstring(pluginVersion), requestedRuntime);
 
@@ -273,7 +312,7 @@ void PluginSystem::Load(const std::filesystem::path& aPath, bool aUseAlteredSear
     const auto& pluginSdk = plugin->GetSdkVersion();
     if (pluginSdk < MINIMUM_SDK_VERSION || pluginSdk > LATEST_SDK_VERSION)
     {
-        spdlog::warn(L"{} (version: {}) uses RED4ext.SDK v{} which is not supported by RED4ext v{}. If you are the "
+        Log::warn(L"{} (version: {}) uses RED4ext.SDK v{} which is not supported by RED4ext v{}. If you are the "
                      L"plugin's author, recompile the plugin with a version of RED4ext.SDK that meets the following "
                      L"criteria: RED4ext.SDK >= {} && RED4ext.SDK <= {}",
                      pluginName, std::to_wstring(pluginVersion), std::to_wstring(pluginSdk), TEXT(RED4EXT_VERSION_STR),
@@ -286,13 +325,13 @@ void PluginSystem::Load(const std::filesystem::path& aPath, bool aUseAlteredSear
 
     if (!plugin->Main(RED4ext::EMainReason::Load))
     {
-        spdlog::warn(L"{} did not initialize properly, unloading...", pluginName);
+        Log::warn(L"{} did not initialize properly, unloading...", pluginName);
         Unload(plugin);
 
         return;
     }
 
-    spdlog::info(L"{} (version: {}, author(s): {}) has been loaded", pluginName, std::to_wstring(pluginVersion),
+    Log::info(L"{} (version: {}, author(s): {}) has been loaded", pluginName, std::to_wstring(pluginVersion),
                  plugin->GetAuthor());
 }
 
@@ -304,7 +343,7 @@ PluginSystem::MapIter_t PluginSystem::Unload(std::shared_ptr<PluginBase> aPlugin
     auto iter = m_plugins.find(module);
     auto result = m_plugins.erase(iter);
 
-    spdlog::info(L"{} has been unloaded", aPlugin->GetName());
+    Log::info(L"{} has been unloaded", aPlugin->GetName());
     return result;
 }
 
@@ -318,15 +357,20 @@ std::shared_ptr<PluginBase> PluginSystem::CreatePlugin(const std::filesystem::pa
     if (!supportsFn)
     {
         // If 'Supports' doesn't exists then the plugin might not be a RED4ext plugin. It might be a dependency.
+#ifdef RED4EXT_PLATFORM_MACOS
+        // On macOS, just silently skip - symbol not found is expected for non-RED4ext plugins
+        return nullptr;
+#else
         auto err = GetLastError();
         if (err != ERROR_PROC_NOT_FOUND)
         {
             auto msg = Utils::FormatLastError();
-            spdlog::warn(L"Could not retrieve 'Supports' function from '{}'. Error code: {}, msg: '{}', path: '{}'",
+            Log::warn(L"Could not retrieve 'Supports' function from '{}'. Error code: {}, msg: '{}', path: '{}'",
                          stem, GetLastError(), msg, aPath);
         }
 
         return nullptr;
+#endif
     }
 
     uint32_t apiVersion;
@@ -337,21 +381,21 @@ std::shared_ptr<PluginBase> PluginSystem::CreatePlugin(const std::filesystem::pa
     }
     catch (const std::exception& e)
     {
-        spdlog::warn(L"An exception occurred while calling 'Supports' function exported by '{}'. Path: '{}'", stem,
+        Log::warn(L"An exception occurred while calling 'Supports' function exported by '{}'. Path: '{}'", stem,
                      aPath);
-        spdlog::warn(e.what());
+        Log::warn(e.what());
         return nullptr;
     }
     catch (...)
     {
-        spdlog::warn(L"An unknown exception occurred while calling 'Supports' function exported by '{}'. Path: '{}'",
+        Log::warn(L"An unknown exception occurred while calling 'Supports' function exported by '{}'. Path: '{}'",
                      stem, aPath);
         return nullptr;
     }
 
     if (apiVersion < MINIMUM_API_VERSION || apiVersion > LATEST_API_VERSION)
     {
-        spdlog::warn(L"'{}' is using an unsupported API version. API version: {}, path: '{}'", stem, apiVersion, aPath);
+        Log::warn(L"'{}' is using an unsupported API version. API version: {}, path: '{}'", stem, apiVersion, aPath);
         return nullptr;
     }
 

@@ -1,14 +1,58 @@
 #include "Image.hpp"
+#include "Platform.hpp"
 #include "Utils.hpp"
+
+#ifdef RED4EXT_PLATFORM_MACOS
+#include <CoreFoundation/CoreFoundation.h>
+#endif
 
 Image::Image()
     : m_isCyberpunk(false)
     , m_fileVersion(RED4EXT_V0_FILEVER(0, 0, 0, 0))
     , m_productVersion(RED4EXT_V0_SEMVER(0, 0, 0))
 {
-    std::wstring fileName;
-    auto hr = wil::GetModuleFileNameW(nullptr, fileName);
-    if (FAILED(hr))
+#ifdef RED4EXT_PLATFORM_MACOS
+    CFBundleRef bundle = CFBundleGetMainBundle();
+    if (!bundle)
+    {
+        return;
+    }
+
+    CFDictionaryRef infoDict = CFBundleGetInfoDictionary(bundle);
+    if (!infoDict)
+    {
+        return;
+    }
+
+    CFStringRef bundleId = (CFStringRef)CFDictionaryGetValue(infoDict, kCFBundleIdentifierKey);
+    if (bundleId)
+    {
+        if (CFStringFind(bundleId, CFSTR("cdprojektred.cyberpunk"), kCFCompareCaseInsensitive).location != kCFNotFound)
+        {
+            m_isCyberpunk = true;
+        }
+    }
+
+    if (m_isCyberpunk)
+    {
+        CFStringRef versionStr = (CFStringRef)CFDictionaryGetValue(infoDict, CFSTR("CFBundleShortVersionString"));
+        if (versionStr)
+        {
+            char buffer[64];
+            if (CFStringGetCString(versionStr, buffer, sizeof(buffer), kCFStringEncodingUTF8))
+            {
+                int major = 0, minor = 0, patch = 0;
+                if (sscanf(buffer, "%d.%d.%d", &major, &minor, &patch) >= 1)
+                {
+                    m_fileVersion = RED4EXT_FILEVER(major, minor, patch, 0);
+                    m_productVersion = RED4EXT_SEMVER(major, minor, patch);
+                }
+            }
+        }
+    }
+#else
+    auto fileName = Platform::GetModuleFileName();
+    if (fileName.empty())
     {
         SHOW_LAST_ERROR_MESSAGE_FILE_LINE(L"Could not get executable's file name.");
         return;
@@ -17,7 +61,7 @@ Image::Image()
     auto size = GetFileVersionInfoSize(fileName.c_str(), nullptr);
     if (!size)
     {
-        auto lastError = GetLastError();
+        auto lastError = Platform::GetLastError();
         if (lastError == ERROR_RESOURCE_DATA_NOT_FOUND || lastError == ERROR_RESOURCE_TYPE_NOT_FOUND)
         {
             // Fail silently, executables might not have the version information.
@@ -109,6 +153,7 @@ Image::Image()
             m_productVersion = RED4EXT_SEMVER(major, minor, patch);
         }
     }
+#endif
 }
 
 Image* Image::Get()

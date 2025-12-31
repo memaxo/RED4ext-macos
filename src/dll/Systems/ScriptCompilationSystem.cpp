@@ -81,19 +81,19 @@ const std::vector<std::string>& ScriptCompilationSystem::GetMixedRefTypes() cons
 
 bool ScriptCompilationSystem::Add(std::shared_ptr<PluginBase> aPlugin, const wchar_t* aPath)
 {
-    spdlog::trace(L"Adding path to script compilation: '{}'", aPath);
+    Log::trace(L"Adding path to script compilation: '{}'", aPath);
     auto resolvedPath = std::filesystem::path(aPath);
     if (resolvedPath.is_absolute())
     {
         if (std::filesystem::exists(resolvedPath))
         {
-            spdlog::trace(L"Found absolute path: {}", resolvedPath.wstring().c_str());
+            Log::trace(L"Found absolute path: {}", resolvedPath.wstring().c_str());
             Add(aPlugin, resolvedPath);
             return true;
         }
         else
         {
-            spdlog::error(L"Could not find absolute path: {}", resolvedPath.wstring().c_str());
+            Log::error(L"Could not find absolute path: {}", resolvedPath.wstring().c_str());
             return false;
         }
     }
@@ -102,13 +102,13 @@ bool ScriptCompilationSystem::Add(std::shared_ptr<PluginBase> aPlugin, const wch
         resolvedPath = aPlugin->GetPath().parent_path() / aPath;
         if (std::filesystem::exists(resolvedPath))
         {
-            spdlog::trace(L"Found path relative to plugin: {}", resolvedPath.wstring().c_str());
+            Log::trace(L"Found path relative to plugin: {}", resolvedPath.wstring().c_str());
             Add(aPlugin, resolvedPath);
             return true;
         }
         else
         {
-            spdlog::error(L"Could not find path relative to plugin: {}", resolvedPath.wstring().c_str());
+            Log::error(L"Could not find path relative to plugin: {}", resolvedPath.wstring().c_str());
             return false;
         }
     }
@@ -119,22 +119,22 @@ std::wstring ScriptCompilationSystem::GetCompilationArgs(const FixedWString& aOr
     fmt::wmemory_buffer buffer;
     if (m_hasScriptsBlob)
     {
-        spdlog::info("Using scriptsBlobPath");
+        Log::info("Using scriptsBlobPath");
         format_to(std::back_inserter(buffer), LR"(-compile "{}" "{}")", m_paths.GetR6Scripts(), m_scriptsBlobPath);
     }
     else
     {
         format_to(std::back_inserter(buffer), aOriginal.str);
     }
-    spdlog::info("Adding paths to redscript compilation:");
+    Log::info("Adding paths to redscript compilation:");
     auto pathsFilePath = m_paths.GetRedscriptPathsFile();
     std::wofstream pathsFile(pathsFilePath, std::ios::out);
     for (const auto& [plugin, path] : m_scriptPaths)
     {
-        spdlog::info(L"{}: '{}'", plugin->GetName(), path);
+        Log::info(L"{}: '{}'", plugin->GetName(), path);
         pathsFile << path.wstring() << std::endl;
     }
-    spdlog::info(L"Paths written to: '{}'", pathsFilePath);
+    Log::info(L"Paths written to: '{}'", pathsFilePath);
     format_to(std::back_inserter(buffer), LR"( -compilePathsFile "{}")", pathsFilePath);
     return fmt::to_string(buffer);
 }

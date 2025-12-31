@@ -21,9 +21,11 @@ private:
 
     void LoadAddresses(const std::filesystem::path& aPath);
     void LoadSections();
+    void LoadSymbols(const std::filesystem::path& aSymbolsPath);
 
     std::uint32_t m_codeOffset;
     std::uint32_t m_dataOffset;
     std::uint32_t m_rdataOffset;
     std::unordered_map<std::uint32_t, std::uintptr_t> m_addresses;
+    std::unordered_map<std::uint32_t, std::string> m_hashToSymbol;
 };

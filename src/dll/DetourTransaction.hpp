@@ -1,5 +1,9 @@
 #pragma once
 
+#ifdef RED4EXT_PLATFORM_MACOS
+#include <mach/mach.h>
+#endif
+
 class DetourTransaction
 {
 public:
@@ -32,5 +36,11 @@ private:
 
     const std::source_location m_source;
     State m_state;
+#ifndef RED4EXT_PLATFORM_MACOS
     std::vector<wil::unique_handle> m_handles;
+#else
+    std::vector<thread_t> m_threads;
+    thread_act_array_t m_threadArray;
+    mach_msg_type_number_t m_threadCount;
+#endif
 };

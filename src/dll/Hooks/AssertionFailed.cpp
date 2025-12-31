@@ -16,30 +16,34 @@ Hook<decltype(&_AssertionFailed)> AssertionFailed_fnc(Hashes::AssertionFailed, &
 
 void _AssertionFailed(const char* aFile, int aLineNum, const char* aCondition, const char* aMessage, ...)
 {
-    spdlog::error("Crash report");
-    spdlog::error("------------");
-    spdlog::error("File: {}", aFile);
-    spdlog::error("Line: {}", aLineNum);
+    Log::error("Crash report");
+    Log::error("------------");
+    Log::error("File: {}", aFile);
+    Log::error("Line: {}", aLineNum);
 
     // Size limit defined by the game.
     char msg[0x400] = "<not supplied>";
 
     if (aCondition)
     {
-        spdlog::error("Condition: {}", aCondition);
+        Log::error("Condition: {}", aCondition);
     }
     if (aMessage)
     {
         va_list args;
         va_start(args, aMessage);
 
+#ifdef RED4EXT_PLATFORM_MACOS
+        vsnprintf(msg, sizeof(msg), aMessage, args);
+#else
         vsnprintf_s(msg, sizeof(msg), aMessage, args);
-        spdlog::error("Message: {}", msg);
+#endif
+        Log::error("Message: {}", msg);
 
         va_end(args);
     }
 
-    spdlog::error("------------");
+    Log::error("------------");
     spdlog::details::registry::instance().flush_all();
 
     AssertionFailed_fnc(aFile, aLineNum, aCondition, msg);
@@ -48,17 +52,17 @@ void _AssertionFailed(const char* aFile, int aLineNum, const char* aCondition, c
 
 bool Hooks::AssertionFailed::Attach()
 {
-    spdlog::trace("Trying to attach the hook for the assertion failed function at {:#x}...",
+    Log::trace("Trying to attach the hook for the assertion failed function at {:#x}...",
                   AssertionFailed_fnc.GetAddress());
 
     auto result = AssertionFailed_fnc.Attach();
     if (result != NO_ERROR)
     {
-        spdlog::error("Could not attach the hook for the assertion failed function. Detour error code: {}", result);
+        Log::error("Could not attach the hook for the assertion failed function. Detour error code: {}", result);
     }
     else
     {
-        spdlog::trace("The hook for the assertion failed function was attached");
+        Log::trace("The hook for the assertion failed function was attached");
     }
 
     isAttached = result == NO_ERROR;
@@ -72,17 +76,17 @@ bool Hooks::AssertionFailed::Detach()
         return false;
     }
 
-    spdlog::trace("Trying to detach the hook for the assertion failed function at {:#x}...",
+    Log::trace("Trying to detach the hook for the assertion failed function at {:#x}...",
                   AssertionFailed_fnc.GetAddress());
 
     auto result = AssertionFailed_fnc.Detach();
     if (result != NO_ERROR)
     {
-        spdlog::error("Could not detach the hook for the assertion failed function. Detour error code: {}", result);
+        Log::error("Could not detach the hook for the assertion failed function. Detour error code: {}", result);
     }
     else
     {
-        spdlog::trace("The hook for the assertion failed function was detached");
+        Log::trace("The hook for the assertion failed function was detached");
     }
 
     isAttached = result != NO_ERROR;

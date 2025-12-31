@@ -7,6 +7,39 @@ ValidationError ValidationError::FromString(const char* str)
     char name[64] = {0};
     char parent[64] = {0};
 
+#ifdef RED4EXT_PLATFORM_MACOS
+    // On macOS, use sscanf (POSIX) instead of sscanf_s (Windows-specific)
+    if (sscanf(str, "Missing native class '%63[^']'", name) == 1)
+    {
+        type = ValidationErrorType::MissingClass;
+    }
+    else if (sscanf(str, "Missing native global function '%63[^']'", name) == 1)
+    {
+        type = ValidationErrorType::MissingGlobalFunction;
+    }
+    else if (sscanf(str, "Missing native function '%63[^']' in native class '%63[^']'", name, parent) == 2)
+    {
+        type = ValidationErrorType::MissingMethod;
+    }
+    else if (sscanf(str, "Missing native property '%63[^']' in native class '%63[^']'", name, parent) == 2)
+    {
+        type = ValidationErrorType::MissingProperty;
+    }
+    else if (sscanf(str, "Missing base class '%63[^']' of native class '%63[^']'", parent, name) == 2)
+    {
+        type = ValidationErrorType::MissingBaseClass;
+    }
+    else if (sscanf(str, "Native class '%63[^']' has declared base class '%63[^']' that is different than current one '%*[^']'",
+                    name, parent) == 2)
+    {
+        type = ValidationErrorType::BaseClassMismatch;
+    }
+    else if (sscanf(str, "Imported property '%63[^.].%63[^']' type '%*[^']' does not match with the native one '%*[^']'",
+                    parent, name) == 2)
+    {
+        type = ValidationErrorType::PropertyTypeMismatch;
+    }
+#else
     if (sscanf_s(str, "Missing native class '%[^']'", name, (int)sizeof(name)) == 1)
     {
         type = ValidationErrorType::MissingClass;
@@ -42,6 +75,7 @@ ValidationError ValidationError::FromString(const char* str)
     {
         type = ValidationErrorType::PropertyTypeMismatch;
     }
+#endif
 
     return { .type = type, .name = name, .parent = parent };
 }

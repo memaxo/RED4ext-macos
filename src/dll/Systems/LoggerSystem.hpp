@@ -72,7 +72,18 @@ private:
             }
         }
 
+#ifdef RED4EXT_PLATFORM_MACOS
+        if constexpr (std::is_same_v<T, wchar_t>)
+        {
+            logger->log(aLevel, "{}", Utils::Narrow(aText));
+        }
+        else
+        {
+            logger->log(aLevel, "{}", aText);
+        }
+#else
         logger->log(aLevel, aText);
+#endif
     }
 
     const Paths& m_paths;

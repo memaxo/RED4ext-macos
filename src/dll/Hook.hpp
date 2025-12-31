@@ -48,7 +48,11 @@ public:
             m_address = reinterpret_cast<T>(GetAddress());
         }
 
+#ifdef RED4EXT_PLATFORM_MACOS
+        auto result = DetourAttach(reinterpret_cast<void**>(&m_address), reinterpret_cast<void*>(m_detour));
+#else
         auto result = DetourAttach(&m_address, m_detour);
+#endif
         m_isAttached = result == NO_ERROR;
 
         return result;
@@ -61,7 +65,11 @@ public:
             return 0;
         }
 
+#ifdef RED4EXT_PLATFORM_MACOS
+        auto result = DetourDetach(reinterpret_cast<void**>(&m_address), reinterpret_cast<void*>(m_detour));
+#else
         auto result = DetourDetach(&m_address, m_detour);
+#endif
         m_isAttached = result == NO_ERROR;
 
         return result;

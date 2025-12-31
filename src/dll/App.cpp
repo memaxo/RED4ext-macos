@@ -2,6 +2,7 @@
 #include "Addresses.hpp"
 #include "DetourTransaction.hpp"
 #include "Image.hpp"
+#include "Platform.hpp"
 #include "Utils.hpp"
 #include "Version.hpp"
 
@@ -26,7 +27,7 @@ App::App()
 {
     if (m_config.GetDev().waitForDebugger)
     {
-        while (!IsDebuggerPresent())
+        while (!Platform::IsDebuggerPresent())
         {
             std::this_thread::yield();
         }
@@ -45,65 +46,82 @@ App::App()
     auto logger = Utils::CreateLogger(L"RED4ext", filename, m_paths, m_config, m_devConsole);
     spdlog::set_default_logger(logger);
 
-    spdlog::info("RED4ext (v{}) is initializing...", RED4EXT_VERSION_STR);
+    Log::info("RED4ext (v{}) is initializing...", RED4EXT_VERSION_STR);
 
-    spdlog::debug("Using the following paths:");
-    spdlog::debug(L"  Root: {}", m_paths.GetRootDir());
-    spdlog::debug(L"  RED4ext: {}", m_paths.GetRED4extDir());
-    spdlog::debug(L"  Logs: {}", m_paths.GetLogsDir());
-    spdlog::debug(L"  Config: {}", m_paths.GetConfigFile());
-    spdlog::debug(L"  Plugins: {}", m_paths.GetPluginsDir());
+    Log::debug("Using the following paths:");
+    Log::debug(L"  Root: {}", m_paths.GetRootDir());
+    Log::debug(L"  RED4ext: {}", m_paths.GetRED4extDir());
+    Log::debug(L"  Logs: {}", m_paths.GetLogsDir());
+    Log::debug(L"  Config: {}", m_paths.GetConfigFile());
+    Log::debug(L"  Plugins: {}", m_paths.GetPluginsDir());
 
-    spdlog::debug("Using the following configuration:");
-    spdlog::debug("  version: {}", m_config.GetVersion());
+    Log::debug("Using the following configuration:");
+    Log::debug("  version: {}", m_config.GetVersion());
 
     const auto& dev = m_config.GetDev();
-    spdlog::debug("  dev.console: {}", dev.hasConsole);
+    Log::debug("  dev.console: {}", dev.hasConsole);
 
     const auto& loggingConfig = m_config.GetLogging();
-    spdlog::debug("  logging.level: {}", spdlog::level::to_string_view(loggingConfig.level));
-    spdlog::debug("  logging.flush_on: {}", spdlog::level::to_string_view(loggingConfig.flushOn));
-    spdlog::debug("  logging.max_files: {}", loggingConfig.maxFiles);
-    spdlog::debug("  logging.max_file_size: {} MB", loggingConfig.maxFileSize);
+    Log::debug("  logging.level: {}", spdlog::level::to_string_view(loggingConfig.level));
+    Log::debug("  logging.flush_on: {}", spdlog::level::to_string_view(loggingConfig.flushOn));
+    Log::debug("  logging.max_files: {}", loggingConfig.maxFiles);
+    Log::debug("  logging.max_file_size: {} MB", loggingConfig.maxFileSize);
 
     const auto& pluginsConfig = m_config.GetPlugins();
-    spdlog::debug("  plugins.enabled: {}", pluginsConfig.isEnabled);
+    Log::debug("  plugins.enabled: {}", pluginsConfig.isEnabled);
 
     const auto& ignored = pluginsConfig.ignored;
     if (ignored.empty())
     {
-        spdlog::debug("  plugins.ignored: []");
+        Log::debug("  plugins.ignored: []");
     }
     else
     {
-        spdlog::debug(L"  plugins.ignored: [ {} ]", fmt::join(ignored, L", "));
+#ifdef RED4EXT_PLATFORM_MACOS
+        // On macOS, convert wstrings to strings for logging
+        std::vector<std::string> ignoredNarrow;
+        for (const auto& ws : ignored)
+        {
+            ignoredNarrow.push_back(Log::Narrow(ws));
+        }
+        Log::debug("  plugins.ignored: [ {} ]", fmt::join(ignoredNarrow, ", "));
+#else
+        Log::debug(L"  plugins.ignored: [ {} ]", fmt::join(ignored, L", "));
+#endif
     }
 
-    spdlog::debug("Base address is: {}", reinterpret_cast<void*>(GetModuleHandle(nullptr)));
+    Log::debug("Base address is: {}", reinterpret_cast<void*>(Platform::GetModuleHandle(nullptr)));
 
     const auto image = Image::Get();
     const auto& fileVer = image->GetFileVersion();
 
     const auto& productVer = image->GetProductVersion();
-    spdlog::info("Product version: {}.{}{}", productVer.major, productVer.minor, productVer.patch);
-    spdlog::info("File version: {}.{}.{}.{}", fileVer.major, fileVer.minor, fileVer.build, fileVer.revision);
+    Log::info("Product version: {}.{}{}", productVer.major, productVer.minor, productVer.patch);
+    Log::info("File version: {}.{}.{}.{}", fileVer.major, fileVer.minor, fileVer.build, fileVer.revision);
 
+#ifdef RED4EXT_PLATFORM_MACOS
+    // On macOS, version scheme differs from Windows (CFBundleShortVersionString vs PE version)
+    // Skip version check for now - macOS port is tested with v2.3.1
+    Log::info("macOS port - version check bypassed (game version: {}.{}.{}.{})", 
+              fileVer.major, fileVer.minor, fileVer.build, fileVer.revision);
+#else
     auto minimumVersion = RED4EXT_RUNTIME_2_31;
     if (fileVer < RED4EXT_RUNTIME_2_31)
     {
-        spdlog::error(L"To use this version of RED4ext, ensure your game is updated to patch 2.31 or newer");
+        Log::error(L"To use this version of RED4ext, ensure your game is updated to patch 2.31 or newer");
         return;
     }
+#endif
 
     Addresses::Construct(m_paths);
 
     if (AttachHooks())
     {
-        spdlog::info("RED4ext has been successfully initialized");
+        Log::info("RED4ext has been successfully initialized");
     }
     else
     {
-        spdlog::error("RED4ext did not initialize properly");
+        Log::error("RED4ext did not initialize properly");
     }
 }
 
@@ -114,20 +132,27 @@ void App::Construct()
 
 void App::Destruct()
 {
-    spdlog::info("RED4ext is terminating...");
+    Log::info("RED4ext is terminating...");
 
     // Detaching hooks here and not in dtor, since the dtor can be called by CRT when the processes exists. We don't
     // really care if this will be called or not when the game exist ungracefully.
 
-    spdlog::trace("Detaching the hooks...");
+    Log::trace("Detaching the hooks...");
 
     DetourTransaction transaction;
     if (transaction.IsValid())
     {
+#ifdef RED4EXT_PLATFORM_MACOS
+        auto success = Hooks::CGameApplication::Detach() && Hooks::ExecuteProcess::Detach() &&
+                       Hooks::InitScripts::Detach() && Hooks::LoadScripts::Detach() &&
+                       Hooks::ValidateScripts::Detach() && Hooks::AssertionFailed::Detach() &&
+                       Hooks::gsmState_SessionActive::Detach();
+#else
         auto success = Hooks::CGameApplication::Detach() && Hooks::Main::Detach() && Hooks::ExecuteProcess::Detach() &&
                        Hooks::InitScripts::Detach() && Hooks::LoadScripts::Detach() &&
                        Hooks::ValidateScripts::Detach() && Hooks::AssertionFailed::Detach() &&
                        Hooks::gsmState_SessionActive::Detach();
+#endif
         if (success)
         {
             transaction.Commit();
@@ -135,7 +160,7 @@ void App::Destruct()
     }
 
     g_app.reset(nullptr);
-    spdlog::info("RED4ext has been terminated");
+    Log::info("RED4ext has been terminated");
 
     spdlog::details::registry::instance().flush_all();
     spdlog::shutdown();
@@ -148,7 +173,7 @@ App* App::Get()
 
 void App::Startup()
 {
-    spdlog::info("RED4ext is starting up...");
+    Log::info("RED4ext is starting up...");
 
     for (auto& system : m_systems)
     {
@@ -158,12 +183,12 @@ void App::Startup()
     auto pluginNames = GetPluginSystem()->GetActivePlugins();
     GetLoggerSystem()->RotateLogs(pluginNames);
 
-    spdlog::info("RED4ext has been started");
+    Log::info("RED4ext has been started");
 }
 
 void App::Shutdown()
 {
-    spdlog::info("RED4ext is shutting down...");
+    Log::info("RED4ext is shutting down...");
 
     for (auto& system : m_systems | std::ranges::views::reverse)
     {
@@ -171,7 +196,7 @@ void App::Shutdown()
     }
 
     m_systems.clear();
-    spdlog::info("RED4ext has been shut down");
+    Log::info("RED4ext has been shut down");
 
     // Flushing the log here, since it is called in the main function, not when DLL is unloaded.
     spdlog::details::registry::instance().flush_all();
@@ -214,7 +239,7 @@ const Paths* App::GetPaths() const
 
 bool App::AttachHooks() const
 {
-    spdlog::trace("Attaching hooks...");
+    Log::trace("Attaching hooks...");
 
     DetourTransaction transaction;
     if (!transaction.IsValid())
@@ -222,6 +247,45 @@ bool App::AttachHooks() const
         return false;
     }
 
+#ifdef RED4EXT_PLATFORM_MACOS
+    // On macOS, we can't patch code on signed binaries due to code signing enforcement.
+    // Try each hook individually and continue even if some fail.
+    // This allows RED4ext to run in a degraded mode where some hooks may not be active.
+    
+    int successCount = 0;
+    int totalHooks = 8;
+    
+    if (Hooks::CGameApplication::Attach()) successCount++; 
+    else Log::warn("CGameApplication hook failed - state management may be limited");
+    
+    if (Hooks::ExecuteProcess::Attach()) successCount++;
+    else Log::warn("ExecuteProcess hook failed - script compilation redirection unavailable");
+    
+    if (Hooks::InitScripts::Attach()) successCount++;
+    else Log::warn("InitScripts hook failed - script initialization hooks unavailable");
+    
+    if (Hooks::LoadScripts::Attach()) successCount++;
+    else Log::warn("LoadScripts hook failed - script loading hooks unavailable");
+    
+    if (Hooks::ValidateScripts::Attach()) successCount++;
+    else Log::warn("ValidateScripts hook failed - script validation hooks unavailable");
+    
+    if (Hooks::AssertionFailed::Attach()) successCount++;
+    else Log::warn("AssertionFailed hook failed - assertion logging unavailable");
+    
+    if (Hooks::CollectSaveableSystems::Attach()) successCount++;
+    else Log::warn("CollectSaveableSystems hook failed - save system hooks unavailable");
+    
+    if (Hooks::gsmState_SessionActive::Attach()) successCount++;
+    else Log::warn("gsmState_SessionActive hook failed - session state hooks unavailable");
+    
+    Log::info("Attached {}/{} hooks successfully", successCount, totalHooks);
+    
+    // On macOS, we consider initialization successful even with partial hooks
+    // Plugin loading and basic functionality should still work
+    transaction.Commit();
+    return true;
+#else
     auto success = Hooks::Main::Attach() && Hooks::CGameApplication::Attach() && Hooks::ExecuteProcess::Attach() &&
                    Hooks::InitScripts::Attach() && Hooks::LoadScripts::Attach() && Hooks::ValidateScripts::Attach() &&
                    Hooks::AssertionFailed::Attach() && Hooks::CollectSaveableSystems::Attach() &&
@@ -232,4 +296,5 @@ bool App::AttachHooks() const
     }
 
     return false;
+#endif
 }

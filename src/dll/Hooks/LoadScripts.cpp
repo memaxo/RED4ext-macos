@@ -29,16 +29,16 @@ bool _CBaseEngine_LoadScripts(RED4ext::CBaseEngine* aEngine, const RED4ext::CStr
 
 bool Hooks::LoadScripts::Attach()
 {
-    spdlog::trace("Trying to attach the hook for load scripts at {:#x}...", CBaseEngine_LoadScripts.GetAddress());
+    Log::trace("Trying to attach the hook for load scripts at {:#x}...", CBaseEngine_LoadScripts.GetAddress());
 
     auto result = CBaseEngine_LoadScripts.Attach();
     if (result != NO_ERROR)
     {
-        spdlog::error("Could not attach the hook for load scripts. Detour error code: {}", result);
+        Log::error("Could not attach the hook for load scripts. Detour error code: {}", result);
     }
     else
     {
-        spdlog::trace("The hook for load scripts was attached");
+        Log::trace("The hook for load scripts was attached");
     }
 
     isAttached = result == NO_ERROR;
@@ -52,16 +52,16 @@ bool Hooks::LoadScripts::Detach()
         return false;
     }
 
-    spdlog::trace("Trying to detach the hook for load scripts at {:#x}...", CBaseEngine_LoadScripts.GetAddress());
+    Log::trace("Trying to detach the hook for load scripts at {:#x}...", CBaseEngine_LoadScripts.GetAddress());
 
     auto result = CBaseEngine_LoadScripts.Detach();
     if (result != NO_ERROR)
     {
-        spdlog::error("Could not detach the hook for load scripts. Detour error code: {}", result);
+        Log::error("Could not detach the hook for load scripts. Detour error code: {}", result);
     }
     else
     {
-        spdlog::trace("The hook for load scripts was detached");
+        Log::trace("The hook for load scripts was detached");
     }
 
     isAttached = result != NO_ERROR;

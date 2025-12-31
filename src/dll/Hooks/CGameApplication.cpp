@@ -48,29 +48,29 @@ bool _CGameApplication_AddState(RED4ext::CGameApplication* aThis, RED4ext::IGame
         }
         default:
         {
-            spdlog::warn("State '{}' ({}) is not handled", aState->GetName(), static_cast<int32_t>(aState->GetType()));
+            Log::warn("State '{}' ({}) is not handled", aState->GetName(), static_cast<int32_t>(aState->GetType()));
         }
         }
 
         if (success)
         {
-            spdlog::trace("All virtual functions were changed successfully");
+            Log::trace("All virtual functions were changed successfully");
         }
         else
         {
-            spdlog::warn(
+            Log::warn(
                 "One or more game state virtual functions could not be changed, the game will continue running "
                 "but unexpected behavior might happen");
         }
     }
     catch (const std::exception& e)
     {
-        spdlog::warn("An exception occurred while changing the virtual functions for the game states");
-        spdlog::warn(e.what());
+        Log::warn("An exception occurred while changing the virtual functions for the game states");
+        Log::warn(e.what());
     }
     catch (...)
     {
-        spdlog::warn("An unknown exception occurred while changing the virtual functions for the game states");
+        Log::warn("An unknown exception occurred while changing the virtual functions for the game states");
     }
 
     return CGameApplication_AddState(aThis, aState);
@@ -79,17 +79,17 @@ bool _CGameApplication_AddState(RED4ext::CGameApplication* aThis, RED4ext::IGame
 
 bool Hooks::CGameApplication::Attach()
 {
-    spdlog::trace("Trying to attach the hook for the game application at {:#x}...",
+    Log::trace("Trying to attach the hook for the game application at {:#x}...",
                   CGameApplication_AddState.GetAddress());
 
     auto result = CGameApplication_AddState.Attach();
     if (result != NO_ERROR)
     {
-        spdlog::error("Could not attach the hook for the game application. Detour error code: {}", result);
+        Log::error("Could not attach the hook for the game application. Detour error code: {}", result);
     }
     else
     {
-        spdlog::trace("The hook for the game application was attached");
+        Log::trace("The hook for the game application was attached");
     }
 
     isAttached = result == NO_ERROR;
@@ -103,17 +103,17 @@ bool Hooks::CGameApplication::Detach()
         return false;
     }
 
-    spdlog::trace("Trying to detach the hook for the game application at {:#x}...",
+    Log::trace("Trying to detach the hook for the game application at {:#x}...",
                   CGameApplication_AddState.GetAddress());
 
     auto result = CGameApplication_AddState.Detach();
     if (result != NO_ERROR)
     {
-        spdlog::error("Could not detach the hook for the game application. Detour error code: {}", result);
+        Log::error("Could not detach the hook for the game application. Detour error code: {}", result);
     }
     else
     {
-        spdlog::trace("The hook for the game application was detached");
+        Log::trace("The hook for the game application was detached");
     }
 
     isAttached = result != NO_ERROR;

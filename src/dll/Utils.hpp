@@ -1,5 +1,7 @@
 #pragma once
 
+#include "Platform.hpp"
+
 class Config;
 class DevConsole;
 class Paths;
@@ -30,7 +32,7 @@ int32_t ShowMessageBox(uint32_t aType, const std::wstring_view aText, Args&&... 
 }
 
 template<typename... Args>
-void ShowLastErrorMessage(uint32_t aType, const std::wstring_view aAdditionalText = "", Args&&... aArgs)
+void ShowLastErrorMessage(uint32_t aType, const std::wstring_view aAdditionalText = L"", Args&&... aArgs)
 {
     auto msg = FormatLastError();
     if (!aAdditionalText.empty())
@@ -44,12 +46,36 @@ void ShowLastErrorMessage(uint32_t aType, const std::wstring_view aAdditionalTex
         }
     }
 
-    auto error = GetLastError();
+    auto error = Platform::GetLastError();
     auto caption = fmt::format(L"RED4ext (error {})", error);
     ShowMessageBoxEx(caption.c_str(), msg.c_str(), aType);
 }
 } // namespace Utils
 
+#ifdef RED4EXT_PLATFORM_MACOS
+// On macOS, paths are always narrow strings
+// Provide both char and wchar_t specializations for compatibility
+template<>
+struct fmt::formatter<std::filesystem::path, char> : formatter<std::string_view, char>
+{
+    template<typename FormatContext>
+    auto format(const std::filesystem::path& path, FormatContext& ctx)
+    {
+        return formatter<std::string_view, char>::format(path.string(), ctx);
+    }
+};
+
+template<>
+struct fmt::formatter<std::filesystem::path, wchar_t> : formatter<std::wstring_view, wchar_t>
+{
+    template<typename FormatContext>
+    auto format(const std::filesystem::path& path, FormatContext& ctx)
+    {
+        // Convert narrow path to wide for formatting
+        return formatter<std::wstring_view, wchar_t>::format(Utils::Widen(path.string()), ctx);
+    }
+};
+#else
 template<typename Char>
 struct fmt::formatter<std::filesystem::path, Char> : formatter<basic_string_view<Char>, Char>
 {
@@ -59,6 +85,7 @@ struct fmt::formatter<std::filesystem::path, Char> : formatter<basic_string_view
         return formatter<basic_string_view<Char>, Char>::format(path.c_str(), ctx);
     }
 };
+#endif
 
 template<typename Char>
 struct fmt::formatter<RED4ext::FileVer, Char> : formatter<basic_string_view<Char>, Char>
@@ -71,6 +98,24 @@ struct fmt::formatter<RED4ext::FileVer, Char> : formatter<basic_string_view<Char
     }
 };
 
+#ifdef RED4EXT_PLATFORM_MACOS
+// On macOS, use simple logging instead of message boxes
+#define SHOW_LAST_ERROR_MESSAGE_FILE_LINE(additionalText, ...)                                                         \
+    Log::warn("Error at {}:{}", __FILE__, __LINE__)
+
+#define SHOW_LAST_ERROR_MESSAGE_AND_EXIT_FILE_LINE(additionalText, ...)                                                \
+    Log::error("Fatal error at {}:{}", __FILE__, __LINE__);                                                            \
+    Platform::TerminateProcess()
+
+#define SHOW_MESSAGE_BOX_FILE_LINE(type, msg, ...)                                                                     \
+    Log::warn("Message at {}:{}", __FILE__, __LINE__)
+
+#define SHOW_MESSAGE_BOX_AND_EXIT_FILE_LINE(msg, ...)                                                                  \
+    Log::error("Fatal error at {}:{}", __FILE__, __LINE__);                                                            \
+    Platform::TerminateProcess()
+
+#else // Windows
+
 #ifndef SHOW_LAST_ERROR_MESSAGE_FILE_LINE
 #define SHOW_LAST_ERROR_MESSAGE_FILE_LINE(additionalText, ...)                                                         \
     Utils::ShowLastErrorMessage(MB_ICONWARNING | MB_OK, additionalText L"\n\n{}:{}", __VA_ARGS__, TEXT(__FILE__),      \
@@ -82,7 +127,7 @@ struct fmt::formatter<RED4ext::FileVer, Char> : formatter<basic_string_view<Char
     Utils::ShowLastErrorMessage(                                                                                       \
         MB_ICONERROR | MB_OK, additionalText L"\n\n{}:{}\n\nThe game will close now to prevent unexpected behavior.",  \
         __VA_ARGS__, TEXT(__FILE__), __LINE__);                                                                        \
-    TerminateProcess(GetCurrentProcess(), 1)
+    Platform::TerminateProcess()
 #endif
 
 #ifndef SHOW_MESSAGE_BOX_FILE_LINE
@@ -95,5 +140,7 @@ struct fmt::formatter<RED4ext::FileVer, Char> : formatter<basic_string_view<Char
     Utils::ShowMessageBox(MB_ICONERROR | MB_OK,                                                                        \
                           msg L"\n\n{}:{}\n\nThe game will close now to prevent unexpected behavior.", __VA_ARGS__,    \
                           TEXT(__FILE__), __LINE__);                                                                   \
-    TerminateProcess(GetCurrentProcess(), 1)
+    Platform::TerminateProcess()
 #endif
+
+#endif // RED4EXT_PLATFORM_MACOS

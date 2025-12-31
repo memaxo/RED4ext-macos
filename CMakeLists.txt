@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.23)
 
-project(RED4ext LANGUAGES CXX)
+project(RED4ext LANGUAGES CXX C)
 
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/cmake")
 
@@ -16,42 +16,58 @@ set_property(GLOBAL PROPERTY USE_FOLDERS ON)
 configure_version_from_git()
 configure_default_output_directories()
 
-add_compile_definitions(
-  # Support Windows 7 and above.
-  WINVER=0x0601
-  _WIN32_WINNT=0x0601
+if(WIN32)
+  add_compile_definitions(
+    # Support Windows 7 and above.
+    WINVER=0x0601
+    _WIN32_WINNT=0x0601
 
-  # Exclude unnecessary APIs.
-  WIN32_LEAN_AND_MEAN
+    # Exclude unnecessary APIs.
+    WIN32_LEAN_AND_MEAN
 
-  # Use Unicode charset.
-  UNICODE
-  _UNICODE
-)
+    # Use Unicode charset.
+    UNICODE
+    _UNICODE
+  )
+elseif(APPLE)
+  add_compile_definitions(RED4EXT_PLATFORM_MACOS)
+  
+  # Ensure ARM64 on Apple Silicon if not specified
+  if(NOT CMAKE_OSX_ARCHITECTURES)
+    set(CMAKE_OSX_ARCHITECTURES "arm64")
+  endif()
+endif()
 
-add_compile_options(
-  # Enable correct reporting of C++ version, see https://docs.microsoft.com/en-us/cpp/build/reference/zc-cplusplus.
-  $<$<BOOL:MSVC>:/Zc:__cplusplus>
+if(MSVC)
+  add_compile_options(
+    # Enable correct reporting of C++ version, see https://docs.microsoft.com/en-us/cpp/build/reference/zc-cplusplus.
+    /Zc:__cplusplus
 
-  # Mark all dependencies headers as external.
-  $<$<BOOL:MSVC>:/external:I${PROJECT_SOURCE_DIR}/deps>
+    # Mark all dependencies headers as external.
+    /external:I${PROJECT_SOURCE_DIR}/deps
 
-  # Set the default warning level for external includes.
-  $<$<BOOL:MSVC>:/external:W0>
+    # Set the default warning level for external includes.
+    /external:W0
 
-  # Allow warnings if some template code is used in our code base.
-  $<$<BOOL:MSVC>:/external:templates->
-)
+    # Allow warnings if some template code is used in our code base.
+    /external:templates-
+  )
+endif()
 
-include(ConfigureAndIncludeDetours)
 include(ConfigureAndIncludeFmt)
 include(ConfigureAndIncludeRED4extSdk)
 include(ConfigureAndIncludeSimdjson)
 include(ConfigureAndIncludeSpdlog)
 include(ConfigureAndIncludeToml11)
 include(ConfigureAndIncludeTslOrderedMap)
-include(ConfigureAndIncludeWil)
 include(ConfigureAndIncludeRedscript)
+
+if(WIN32)
+  include(ConfigureAndIncludeDetours)
+  include(ConfigureAndIncludeWil)
+elseif(APPLE)
+  include(ConfigureAndIncludeFishhook)
+endif()
 
 option(RED4EXT_EXTRA_WARNINGS "Enable extra warnings." ON)
 if(RED4EXT_EXTRA_WARNINGS)

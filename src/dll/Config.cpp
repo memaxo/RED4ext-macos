@@ -91,20 +91,24 @@ void Config::Save(const std::filesystem::path& aFile)
 {
     try
     {
-        using ordered_value = toml::basic_value<toml::preserve_comments, tsl::ordered_map>;
+#ifdef RED4EXT_PLATFORM_MACOS
+        using value_type = toml::basic_value<toml::preserve_comments, std::map>;
+#else
+        using value_type = toml::basic_value<toml::preserve_comments, tsl::ordered_map>;
+#endif
 
         auto logLevel = spdlog::level::to_string_view(m_logging.level).data();
         auto flushOn = spdlog::level::to_string_view(m_logging.flushOn).data();
 
-        ordered_value config{
+        value_type config{
             {"version", LatestVersion},
-            {"logging", ordered_value{{"level", logLevel},
-                                      {"flush_on", flushOn},
-                                      {"max_files", m_logging.maxFiles},
-                                      {"max_file_size", m_logging.maxFileSize}}},
+            {"logging", value_type{{"level", logLevel},
+                                   {"flush_on", flushOn},
+                                   {"max_files", m_logging.maxFiles},
+                                   {"max_file_size", m_logging.maxFileSize}}},
 
-            {"plugins", ordered_value{{"enabled", m_plugins.isEnabled}, {"ignored", std::vector<std::string>{}}}},
-            {"dev", ordered_value{{"console", m_dev.hasConsole}, {"wait_for_debugger", m_dev.waitForDebugger}}}};
+            {"plugins", value_type{{"enabled", m_plugins.isEnabled}, {"ignored", std::vector<std::string>{}}}},
+            {"dev", value_type{{"console", m_dev.hasConsole}, {"wait_for_debugger", m_dev.waitForDebugger}}}};
 
         config.comments().push_back(
             " See https://docs.red4ext.com/getting-started/configuration for more options or information.");
@@ -190,6 +194,10 @@ void Config::PluginsConfig::LoadV0(const toml::value& aConfig)
 
     for (const auto& plugin : ignoredPlugins)
     {
+#ifdef RED4EXT_PLATFORM_MACOS
         ignored.emplace(Utils::Widen(plugin));
+#else
+        ignored.emplace(Utils::Widen(plugin));
+#endif
     }
 }
