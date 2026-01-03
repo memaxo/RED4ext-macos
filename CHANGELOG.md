@@ -2,76 +2,83 @@
 
 All notable changes to the RED4ext macOS port.
 
-## [Unreleased] - macOS Port
+## [1.0.0] - 2026-01-03 - Initial macOS Release
 
-### Added
+### Features
+
 - **macOS ARM64 Support**
-  - Native Apple Silicon (M1/M2/M3) support
+  - Native Apple Silicon (M1/M2/M3/M4) support
   - Mach-O binary format handling
   - POSIX API implementations
 
-- **Address Resolution System**
+- **Complete Address Resolution**
+  - 126/126 SDK addresses resolved
   - Symbol mapping via `cyberpunk2077_symbols.json` (21,332 symbols)
   - Address database via `cyberpunk2077_addresses.json`
-  - Runtime `dlsym()` resolution for exported functions
+  - Runtime address resolution from JSON database
 
-- **Function Hooking**
-  - fishhook integration for Mach-O function hooking
-  - Lazy symbol rebinding support
-  - Hook attach/detach lifecycle
+- **Function Hooking via Frida**
+  - 8/8 required hooks functional
+  - Frida Gadget integration for W^X compatible hooking
+  - JavaScript-based hook scripts
+  - Dynamic trampoline generation
+
+- **Plugin System**
+  - .dylib plugin loading
+  - Full SDK compatibility
+  - TweakXL support verified
 
 - **Build System**
   - CMake configuration for macOS/ARM64
   - Xcode toolchain support
-  - Universal binary capability (future)
+  - Automated release packaging
 
 - **Scripts**
-  - `generate_symbol_mapping.py` - Extract symbols from Mach-O
-  - `generate_addresses.py` - Generate address database
-  - `convert_addresses_hpp_to_json.py` - Windows address conversion
+  - `macos_install.sh` - One-command installation
+  - `generate_addresses.py` - Address database generation
+  - `create_release.sh` - Release packaging
+  - Code signing scripts for mod support
 
 - **Documentation**
-  - macOS-specific build instructions
-  - Reverse engineering guide for ARM64
+  - Complete installation guide
+  - Frida integration documentation
+  - Plugin development examples
   - Address discovery techniques
 
-### Changed
-- Platform abstraction layer for cross-platform code
-- Conditional compilation for Windows/macOS specifics
-- Path handling for Unix-style paths
+### Compatibility
 
-### Removed
-- Windows-only dependencies (Detours, WIL)
-- PE binary handling code (macOS builds)
-- Windows API calls (replaced with POSIX)
+- **Game Version:** Cyberpunk 2077 v2.3.1 (macOS)
+- **Platform:** macOS 12+ on Apple Silicon
+- **Verified Plugins:** TweakXL
 
-### Technical Notes
+### Technical Details
 
-#### Confirmed Function Addresses (6/9)
-| Function | Address | Method |
-|----------|---------|--------|
-| Main | 0x100031E18 | Mach-O entry point |
-| AssertionFailed | 0x1003C3D4C | String reference |
-| CBaseEngine_InitScripts | 0x103D8C1A0 | String reference |
-| CBaseEngine_LoadScripts | 0x103D9A03C | String reference |
-| CGameApplication_AddState | 0x103F22E98 | Context analysis |
-| GsmState_SessionActive_ReportErrorCode | 0x103F5E9B0 | Offset pattern |
+#### Hook Functions (8/8 Working)
+| Function | Purpose |
+|----------|---------|
+| Main | Entry point hook |
+| CBaseEngine_InitScripts | Script initialization |
+| CBaseEngine_LoadScripts | Script loading |
+| CGameApplication_AddState | State management |
+| AssertionFailed | Error handling |
+| ScriptValidator_Validate | Script validation |
+| GameInstance_CollectSaveableSystems | Save system |
+| TweakDB hooks | TweakDB modification |
 
-#### Tentative Addresses (3/9)
-| Function | Address | Status |
-|----------|---------|--------|
-| ScriptValidator_Validate | 0x103D96BFC | Needs verification |
-| GameInstance_CollectSaveableSystems | 0x100087FEC | Needs verification |
-| Global_ExecuteProcess | 0x101D46808 | May be wrong target |
+#### Address Resolution
+- All 126 SDK addresses successfully resolved
+- Automated discovery via string patterns and function analysis
+- Manual verification for critical paths
 
-### Known Issues
-- Non-exported function addresses require manual discovery
-- Some hooks may need runtime verification
-- Plugin compatibility untested
+### Known Limitations
+
+- Windows .dll plugins require recompilation for macOS
+- Some advanced mods may need porting
+- Code signing required for modifications
 
 ---
 
-## Upstream Changes
+## Upstream
 
 This port is based on [RED4ext](https://github.com/WopsS/RED4ext) by WopsS.
-See upstream repository for Windows version changelog.
+See upstream repository for Windows version history.

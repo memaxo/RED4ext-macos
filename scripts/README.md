@@ -1,131 +1,81 @@
-# RED4ext macOS Scripts
+# RED4ext Scripts
 
-Scripts for building, installing, and maintaining RED4ext on macOS.
+This directory contains essential scripts for building, installing, and maintaining RED4ext on macOS.
 
 ## Installation Scripts
 
 | Script | Description |
 |--------|-------------|
-| `macos_install.sh` | **Main installer** - One-command setup |
-| `setup_frida_gadget.sh` | Download and configure Frida Gadget |
-
-## Usage
-
-### Full Installation
-
-```bash
-# Install everything (auto-downloads Frida, copies files)
-./scripts/macos_install.sh
-
-# Build from source then install
-./scripts/macos_install.sh --build
-
-# Specify custom game directory
-./scripts/macos_install.sh --game-dir "/path/to/Cyberpunk 2077"
-```
-
-### Frida Gadget Only
-
-```bash
-# Download and install Frida Gadget
-./scripts/setup_frida_gadget.sh
-```
-
----
-
-## Address Resolution Scripts
-
-Scripts for generating address databases for hooking.
-
-| Script | Description |
-|--------|-------------|
-| `generate_symbol_mapping.py` | Generate hash→symbol mappings from binary |
-| `generate_addresses.py` | Generate hash→offset address database |
-| `convert_addresses_hpp_to_json.py` | Convert Windows Addresses.hpp to JSON |
-
-### Symbol Mapping
-
-```bash
-python3 scripts/generate_symbol_mapping.py \
-    "/path/to/Cyberpunk2077.app/Contents/MacOS/Cyberpunk2077" \
-    --output build/cyberpunk2077_symbols.json
-```
-
-Output: `cyberpunk2077_symbols.json` with 21,332 symbol mappings.
-
-### Address Database
-
-```bash
-python3 scripts/generate_addresses.py \
-    "/path/to/Cyberpunk2077.app/Contents/MacOS/Cyberpunk2077" \
-    --manual scripts/manual_addresses_template.json \
-    --output build/cyberpunk2077_addresses.json
-```
-
-Output: `cyberpunk2077_addresses.json` with 9 function offsets.
-
----
+| `macos_install.sh` | Main installation script - detects game, copies files, signs binaries |
+| `setup_frida_gadget.sh` | Sets up Frida Gadget for function hooking |
 
 ## Code Signing Scripts
 
-For re-signing the game binary (not usually needed with Frida approach).
+| Script | Description |
+|--------|-------------|
+| `macos_resign_for_hooks.sh` | Re-signs game binary and libraries for mod support |
+| `macos_resign_backup.sh` | Backs up original code signatures before modification |
+| `macos_resign_restore.sh` | Restores original code signatures |
+
+## Address Generation Scripts
 
 | Script | Description |
 |--------|-------------|
-| `macos_resign_backup.sh` | Create backup before re-signing |
-| `macos_resign_for_hooks.sh` | Re-sign with hooking entitlements |
-| `macos_resign_restore.sh` | Restore original signature |
+| `generate_addresses.py` | Generates `cyberpunk2077_addresses.json` from game binary |
+| `generate_symbol_mapping.py` | Extracts symbol information from binary |
+| `convert_addresses_hpp_to_json.py` | Converts Windows address header to JSON format |
+| `download_windows_addresses.py` | Downloads Windows address library for reference |
 
-⚠️ **Note:** These scripts are for advanced users. The Frida Gadget approach does not require re-signing.
+## Release Scripts
 
----
-
-## Frida Files
-
-Located in `scripts/frida/`:
-
-| File | Description |
-|------|-------------|
-| `FridaGadget.config` | Auto-load configuration |
-| `red4ext_hooks.js` | Hook implementations |
-
----
+| Script | Description |
+|--------|-------------|
+| `create_release.sh` | Creates distributable release package |
 
 ## Data Files
 
 | File | Description |
 |------|-------------|
-| `manual_addresses_template.json` | Manual address entries for hooks |
-| `cyberpunk2077_addresses.json` | Generated address database |
-| `red4ext_entitlements.plist` | macOS entitlements (for re-signing) |
+| `cyberpunk2077_addresses.json` | **Essential** - Address database for SDK |
+| `manual_addresses_template.json` | Source of truth for manual addresses |
+| `cyberpunk2077_symbols.json` | Symbol mapping (can be regenerated) |
 
----
+## Frida Directory
 
-## Generated Files
+The `frida/` subdirectory contains:
+- `FridaGadget.dylib` - Frida runtime library
+- `FridaGadget.config` - Frida configuration
+- `red4ext_hooks.js` - Hook scripts for game functions
 
-After running `generate_symbol_mapping.py`:
+## Development Scripts
 
-- `cyberpunk2077_symbols.json` - Hash→symbol mappings (21,332 entries)
+Development and analysis scripts are in `dev/` (not included in releases).
 
-After running `generate_addresses.py`:
+## Usage Examples
 
-- `cyberpunk2077_addresses.json` - Hash→offset mappings (9 entries)
-
----
-
-## Test Script
+### Fresh Installation
 
 ```bash
-# Verify Frida setup
-./scripts/test_frida_hooks.sh
+# Install RED4ext to game directory
+./macos_install.sh
+
+# If signing issues occur
+./macos_resign_for_hooks.sh
 ```
 
----
+### After Game Update
 
-## Documentation
+```bash
+# Regenerate addresses for new game version
+python3 generate_addresses.py \
+    "/path/to/Cyberpunk2077.app/Contents/MacOS/Cyberpunk2077" \
+    --manual manual_addresses_template.json \
+    --output cyberpunk2077_addresses.json
+```
 
-| File | Description |
-|------|-------------|
-| `README.md` | This file |
-| `README_SYMBOL_MAPPING.md` | Symbol mapping details |
-| `REVERSE_ENGINEERING_GUIDE.md` | ARM64 reverse engineering |
+### Create Release Package
+
+```bash
+./create_release.sh 1.0.0
+# Creates release/RED4ext-macOS-ARM64-v1.0.0.zip
+```

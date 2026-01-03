@@ -52,6 +52,26 @@ const CONFIG = {
         
         // GsmState_SessionActive::ReportErrorCode - Session state
         0x7FA31576: { name: 'GsmState_SessionActive_ReportErrorCode', offset: 0x3F5E9B0, enabled: true },
+        
+        // =====================================================================
+        // TweakXL-specific hooks (TweakDB functions)
+        // NOTE: Offsets need to be found via reverse engineering
+        // =====================================================================
+        
+        // TweakDB_Init - Database initialization (hash: 3062572522)
+        0xB6832FEA: { name: 'TweakDB_Init', offset: 0x0, enabled: false },
+        
+        // TweakDB_Load - Load optimized DB (hash: 3602585178)
+        0xD6B1DB5A: { name: 'TweakDB_Load', offset: 0x0, enabled: false },
+        
+        // TweakDB_TryLoad - Try loading DB (hash: 3512345737)
+        0xD16A2999: { name: 'TweakDB_TryLoad', offset: 0x0, enabled: false },
+        
+        // TweakDB_CreateRecord - Create DB record (hash: 838931066)
+        0x31FB0F6A: { name: 'TweakDB_CreateRecord', offset: 0x0, enabled: false },
+        
+        // TweakDBID_Derive - Derive TweakDB ID (hash: 326438016)
+        0x137620C0: { name: 'TweakDBID_Derive', offset: 0x0, enabled: false },
     }
 };
 
@@ -339,6 +359,106 @@ function hookGsmState_SessionActive_ReportErrorCode(address) {
 }
 
 // ============================================================================
+// TweakXL Hook Handlers
+// ============================================================================
+
+/**
+ * Hook: TweakDB_Init - Database initialization
+ */
+function hookTweakDB_Init(address) {
+    Interceptor.attach(address, {
+        onEnter: function(args) {
+            hookStats['TweakDB_Init'] = (hookStats['TweakDB_Init'] || 0) + 1;
+            logInfo('TweakDB::Init called - TweakDB initializing');
+            logTrace(`  this: ${formatPtr(args[0])}, arg1: ${formatPtr(args[1])}`);
+        },
+        onLeave: function(retval) {
+            logInfo('TweakDB::Init completed');
+        }
+    });
+}
+
+/**
+ * Hook: TweakDB_Load - Load optimized database
+ */
+function hookTweakDB_Load(address) {
+    Interceptor.attach(address, {
+        onEnter: function(args) {
+            hookStats['TweakDB_Load'] = (hookStats['TweakDB_Load'] || 0) + 1;
+            logInfo('TweakDB::Load called - Loading TweakDB');
+            
+            // Try to read the path argument (CString)
+            const pathPtr = args[1];
+            if (pathPtr && !pathPtr.isNull()) {
+                const innerPtr = safeReadPointer(pathPtr);
+                if (innerPtr) {
+                    const path = safeReadCString(innerPtr);
+                    if (path) {
+                        logInfo(`  Loading: ${path}`);
+                    }
+                }
+            }
+        },
+        onLeave: function(retval) {
+            logInfo('TweakDB::Load completed');
+        }
+    });
+}
+
+/**
+ * Hook: TweakDB_TryLoad - Try loading database
+ */
+function hookTweakDB_TryLoad(address) {
+    Interceptor.attach(address, {
+        onEnter: function(args) {
+            hookStats['TweakDB_TryLoad'] = (hookStats['TweakDB_TryLoad'] || 0) + 1;
+            logInfo('TweakDB::TryLoad called');
+        },
+        onLeave: function(retval) {
+            const success = retval.toInt32();
+            logInfo(`TweakDB::TryLoad ${success ? 'succeeded' : 'failed'}`);
+        }
+    });
+}
+
+/**
+ * Hook: TweakDB_CreateRecord - Create database record
+ */
+function hookTweakDB_CreateRecord(address) {
+    Interceptor.attach(address, {
+        onEnter: function(args) {
+            hookStats['TweakDB_CreateRecord'] = (hookStats['TweakDB_CreateRecord'] || 0) + 1;
+            logDebug('TweakDB::CreateRecord called');
+            
+            // args[0] = this (TweakDB*)
+            // args[1] = recordType (uint32)
+            // args[2] = recordId (TweakDBID)
+            const recordType = safeReadInt32(args[1]);
+            if (recordType !== null) {
+                logTrace(`  recordType: 0x${recordType.toString(16)}`);
+            }
+        }
+    });
+}
+
+/**
+ * Hook: TweakDBID_Derive - Derive TweakDB ID from base
+ */
+function hookTweakDBID_Derive(address) {
+    Interceptor.attach(address, {
+        onEnter: function(args) {
+            hookStats['TweakDBID_Derive'] = (hookStats['TweakDBID_Derive'] || 0) + 1;
+            
+            // args[2] = name string
+            const nameStr = safeReadCString(args[2]);
+            if (nameStr) {
+                logTrace(`TweakDBID::Derive: ${nameStr}`);
+            }
+        }
+    });
+}
+
+// ============================================================================
 // Hook Installation
 // ============================================================================
 
@@ -352,6 +472,12 @@ const hookFunctions = {
     'AssertionFailed': hookAssertionFailed,
     'GameInstance_CollectSaveableSystems': hookGameInstance_CollectSaveableSystems,
     'GsmState_SessionActive_ReportErrorCode': hookGsmState_SessionActive_ReportErrorCode,
+    // TweakXL hooks
+    'TweakDB_Init': hookTweakDB_Init,
+    'TweakDB_Load': hookTweakDB_Load,
+    'TweakDB_TryLoad': hookTweakDB_TryLoad,
+    'TweakDB_CreateRecord': hookTweakDB_CreateRecord,
+    'TweakDBID_Derive': hookTweakDBID_Derive,
 };
 
 function installHooks() {

@@ -364,3 +364,9 @@ FodyWeavers.xsd
 ### Custom ###
 build
 src/dll/Version.hpp
+cyberpunk.rep/
+cyberpunk.gpr
+scripts/dev/
+scripts/__pycache__/
+release/
+scripts/symbols_*.txt
