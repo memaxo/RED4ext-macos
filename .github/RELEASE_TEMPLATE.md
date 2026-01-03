@@ -1,25 +1,32 @@
-# RED4ext for macOS v${VERSION}
+# RED4ext for macOS v${VERSION} (Beta)
 
 Script extender for Cyberpunk 2077 on macOS Apple Silicon.
+
+## ⚠️ Beta Release
+
+This is an early macOS port. **Not all features have full parity with Windows.**
+
+- Addresses resolved via pattern matching (not all runtime-verified)
+- Only TweakXL plugin tested
+- Different hook mechanism than Windows (Frida vs Detours)
+- Please report issues on GitHub
 
 ## Downloads
 
 | File | Description |
 |------|-------------|
 | `RED4ext-macOS-ARM64-v${VERSION}.zip` | Complete release package |
-| `RED4ext-macOS-ARM64-v${VERSION}.tar.gz` | Alternative archive |
 
 ## Requirements
 
 - macOS 12+ (Monterey or later)
 - Apple Silicon Mac (M1/M2/M3/M4)
-- Cyberpunk 2077 (Steam, macOS native version)
+- Cyberpunk 2077 (Steam, macOS native)
 - Xcode Command Line Tools
 
 ## Quick Install
 
 ```bash
-# Extract and install
 unzip RED4ext-macOS-ARM64-v${VERSION}.zip
 cd RED4ext-macOS-ARM64-v${VERSION}
 ./scripts/macos_install.sh
@@ -29,35 +36,39 @@ cd RED4ext-macOS-ARM64-v${VERSION}
 
 ```
 red4ext/
-├── RED4ext.dylib              # Main loader library
-├── FridaGadget.config         # Frida configuration  
-├── red4ext_hooks.js           # Hook scripts
+├── RED4ext.dylib                 # Main loader
+├── FridaGadget.config            # Frida config  
+├── red4ext_hooks.js              # Hook scripts
 ├── cyberpunk2077_addresses.json  # Address database
-└── plugins/                   # Plugin directory
+└── plugins/                      # Plugin directory
 
 scripts/
-├── macos_install.sh           # Installation script
-├── generate_addresses.py      # Address regeneration
-└── macos_resign_*.sh          # Code signing scripts
+├── macos_install.sh              # Installer
+├── generate_addresses.py         # Address regeneration
+└── macos_resign_*.sh             # Code signing
 ```
 
 ## Compatibility
 
-- **Game Version:** Cyberpunk 2077 v2.3.1
-- **SDK Addresses:** 126/126 resolved
-- **Verified Plugins:** TweakXL
+| Item | Status |
+|------|--------|
+| Game Version | Cyberpunk 2077 v2.3.1 |
+| SDK Addresses | 126 resolved (not all verified) |
+| TweakXL | ✅ Basic functionality |
+| Other plugins | ❓ Untested |
 
-## Changelog
+## Known Limitations
 
-See [CHANGELOG.md](https://github.com/memaxo/RED4ext/blob/main/CHANGELOG.md) for details.
+- Windows .dll plugins require recompilation
+- Some SDK functions may behave differently
+- Edge cases not tested
 
-## SHA256 Checksums
+## SHA256
 
 ```
 ${SHA_ZIP}  RED4ext-macOS-ARM64-v${VERSION}.zip
-${SHA_TAR}  RED4ext-macOS-ARM64-v${VERSION}.tar.gz
 ```
 
 ---
 
-**Note:** FridaGadget.dylib is downloaded automatically during installation.
+**FridaGadget.dylib downloaded during installation.**

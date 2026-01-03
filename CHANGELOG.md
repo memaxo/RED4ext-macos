@@ -2,7 +2,9 @@
 
 All notable changes to the RED4ext macOS port.
 
-## [1.0.0] - 2026-01-03 - Initial macOS Release
+## [1.0.0-beta] - 2026-01-03 - Initial macOS Release (Beta)
+
+> ⚠️ **Beta Release** - Not all features verified. Please report issues.
 
 ### Features
 
