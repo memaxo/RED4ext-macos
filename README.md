@@ -60,7 +60,7 @@ cd RED4ext-macOS-ARM64-vX.X.X
 
 ```bash
 # 1. Clone with submodules (--recursive is required!)
-git clone --recursive https://github.com/memaxo/RED4ext.git
+git clone --recursive https://github.com/memaxo/RED4ext-macos.git
 cd RED4ext
 
 # 2. Check requirements
